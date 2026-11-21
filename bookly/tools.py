@@ -59,6 +59,18 @@ def _digits(s: str) -> str:
     return re.sub(r"\D", "", s or "")
 
 
+def spoken_date(iso: str | None) -> str | None:
+    """'2026-11-23' -> 'Monday, November 23rd' (year added only if not this year).
+    Tools hand the model the words to say, so it never works out a weekday itself."""
+    if not iso:
+        return None
+    d = date.fromisoformat(iso)
+    n = d.day
+    suffix = "th" if 11 <= n % 100 <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    out = f"{d.strftime('%A, %B')} {n}{suffix}"
+    return out if d.year == date.today().year else f"{out}, {d.year}"
+
+
 def _mask_email(email: str) -> str:
     user, _, domain = email.partition("@")
     return f"{user[0]}***@{domain}"
@@ -83,7 +95,7 @@ def order_summaries(conn, customer_id: int) -> list[dict[str, Any]]:
         items = conn.execute(
             "SELECT title, author FROM order_items WHERE order_number = ?", (o["order_number"],)
         ).fetchall()
-        out.append({"order_number": o["order_number"], "placed_at": o["placed_at"],
+        out.append({"order_number": o["order_number"], "placed_at": spoken_date(o["placed_at"]),
                     "items": [dict(i) for i in items]})
     return out
 
@@ -153,7 +165,8 @@ def _item_eligibility(order: sqlite3.Row, item_id: int, existing: dict | None) -
     days = (date.today() - delivered).days
     window_ends = date.fromordinal(delivered.toordinal() + RETURN_WINDOW_DAYS).isoformat()
     if days > RETURN_WINDOW_DAYS:
-        return False, f"outside_30_day_window: delivered {days} days ago, window ended {window_ends}", window_ends
+        return False, (f"outside_30_day_window: delivered {spoken_date(order['delivered_at'])} ({days} days ago), "
+                       f"window ended {spoken_date(window_ends)}"), window_ends
     return True, None, window_ends
 
 
@@ -169,17 +182,17 @@ def _order_view(ctx: ToolContext, order: sqlite3.Row) -> dict[str, Any]:
         out_items.append({
             "item_id": it["id"], "title": it["title"], "author": it["author"],
             "format": it["format"], "price": _money(it["price_cents"]),
-            "returnable": ok, "not_returnable_reason": why, "return_window_ends": window_ends,
+            "returnable": ok, "not_returnable_reason": why, "return_window_ends": spoken_date(window_ends),
             "existing_return": ({"return_id": ret["id"], "resolution": ret["resolution"], "status": ret["status"]}
                                 if ret else None),
         })
     view = {
         "order_number": order["order_number"],
         "status": order["status"],
-        "placed_at": order["placed_at"],
-        "shipped_at": order["shipped_at"],
-        "delivered_at": order["delivered_at"],
-        "estimated_delivery": order["eta"] if order["status"] in ("processing", "shipped") else None,
+        "placed_at": spoken_date(order["placed_at"]),
+        "shipped_at": spoken_date(order["shipped_at"]),
+        "delivered_at": spoken_date(order["delivered_at"]),
+        "estimated_delivery": spoken_date(order["eta"]) if order["status"] in ("processing", "shipped") else None,
         "carrier": order["carrier"],
         "has_tracking": bool(order["tracking_number"]),
         "cancellable": order["status"] == "processing",

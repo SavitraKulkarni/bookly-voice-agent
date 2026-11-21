@@ -89,7 +89,9 @@ Multi-order customer; multi-book order; statuses `processing` (offer cancel), `s
 - `.env.example` lists variable names only: Anthropic key + model, AssemblyAI key, Cartesia key + voice ID, Twilio SID/token/number, transfer number, public host.
 - Python: system `python3` is 3.9 (too old for current Anthropic SDK); use Homebrew `python3.13` in a `.venv`.
 
-## Commands (fill in as they exist)
-- Text mode: `python -m bookly.cli --phone +1...`
-- Simulations: `python -m bookly.simulate`
-- Phone mode: `python -m bookly.server` + ngrok
+## Commands
+- Text mode: `.venv/bin/python -m bookly.cli --phone +14155550101 -v`
+- Simulations: `.venv/bin/python -m bookly.simulate` (A/B: `--compare "base:" "x:prefetch=1" --repeats 3`)
+- Guardrail tests: `.venv/bin/python -m pytest -q tests`
+- Phone mode: `.venv/bin/python -m bookly.voice.server` + `ngrok http --url=$PUBLIC_HOST 8080`; webhook `https://$PUBLIC_HOST/voice`
+- Phone test without a phone: `.venv/bin/python -m bookly.voice.loopback --phone +13125550142` (`--silent` for the reprompt)

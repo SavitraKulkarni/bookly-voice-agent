@@ -94,6 +94,7 @@ class Agent:
         self.system = build_system_prompt()
         self.messages: list[dict[str, Any]] = []  # append-only
         self.started = time.monotonic()
+        self.extra_summary: dict[str, Any] = {}  # transport-specific metrics (phone mode)
 
         self.log.event("call_start", caller_id=caller_id, model=self.model, effort=self.effort,
                        prefetch=self.prefetch, terminal_say=self.terminal_say)
@@ -228,8 +229,6 @@ class Agent:
         latency = round((time.monotonic() - t_turn) * 1000)
         self.log.event("agent_turn", text=text, latency_ms=latency, model_ms=model_ms, tools_ms=tools_ms,
                        tool_rounds=rounds, ended=st.ended)
-        if st.ended:
-            self.end()
         return Reply(text=text, ended=st.ended, handoff=st.handoff, latency_ms=latency, tools_used=tools_used)
 
     def _fail_safe(self, t_turn: float, tools_used: list[str], why: str) -> Reply:
@@ -242,7 +241,6 @@ class Agent:
         latency = round((time.monotonic() - t_turn) * 1000)
         self.log.event("agent_turn", text=FALLBACK_LINE, latency_ms=latency, model_ms=0, tools_ms=0,
                        tool_rounds=0, ended=True, fail_safe=why)
-        self.end()
         return Reply(text=FALLBACK_LINE, ended=True, handoff=self.state.handoff, latency_ms=latency,
                      tools_used=tools_used)
 
@@ -265,6 +263,7 @@ class Agent:
             "tool_calls": len(self.log.tool_calls()),
             "latency_ms": {"p50": int(statistics.median(lat)) if lat else None,
                            "max": max(lat) if lat else None},
+            **self.extra_summary,
         }
 
     _ended_logged = False

@@ -5,6 +5,7 @@ One file per call in logs/. Never log environment variables or keys.
 from __future__ import annotations
 
 import json
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +25,7 @@ class CallLogger:
         self.echo = echo
         self.events: list[dict[str, Any]] = []
         self.started = time.monotonic()
+        self._lock = threading.Lock()  # phone mode logs from the event loop and the agent thread
 
     def event(self, kind: str, **data: Any) -> dict[str, Any]:
         rec = {
@@ -33,9 +35,10 @@ class CallLogger:
             "event": kind,
             **data,
         }
-        self.events.append(rec)
-        with self.path.open("a") as f:
-            f.write(json.dumps(rec, default=str) + "\n")
+        with self._lock:
+            self.events.append(rec)
+            with self.path.open("a") as f:
+                f.write(json.dumps(rec, default=str) + "\n")
         if self.echo:
             print(f"  · {kind}: {json.dumps(data, default=str)[:240]}")
         return rec

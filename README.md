@@ -4,7 +4,13 @@ A voice customer-support agent for Bookly, a fictional online bookstore. Built f
 
 > **Thesis:** A great CX agent knows its boundaries: it resolves what it can with grounded tool calls, asks when it's unsure, and hands off cleanly when it shouldn't decide.
 
-_Work in progress: text mode and simulations (P0) are in place; phone mode is next. Full run instructions, assumptions and the requirements map land as each tier works._
+**Status:** text mode, simulations (P0) and phone mode (P1) work end to end. Streaming sentence-by-sentence, barge-in and a real transfer (P2) are next.
+
+```
+Caller → Twilio media stream (8 kHz μ-law) → AssemblyAI streaming STT
+       → orchestrator: Claude (Opus 5.5) + tools + call state + guardrails   ← text CLI and simulations plug in here
+       → Cartesia TTS (8 kHz μ-law) → Twilio → caller
+```
 
 ## Run it (text mode)
 
@@ -19,6 +25,60 @@ cp .env.example .env            # then fill in ANTHROPIC_API_KEY
 - `--phone` simulates caller ID (see [data/seed.py](data/seed.py) for the seeded customers; `+15125550199` is an unknown number).
 - Simulations: `.venv/bin/python -m bookly.simulate` (transcripts in [docs/transcripts/](docs/transcripts/)).
 - Guardrail tests (no API key needed): `.venv/bin/python -m pytest -q tests`.
+
+## Run it (phone mode)
+
+Needs the voice keys in `.env` (`ASSEMBLYAI_API_KEY`, `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`) and `PUBLIC_HOST` set to your ngrok domain (no `https://`).
+
+```bash
+.venv/bin/python -m bookly.voice.server
+```
+
+```bash
+ngrok http --url=$PUBLIC_HOST 8080
+```
+
+Point the Twilio number's Voice webhook at `https://$PUBLIC_HOST/voice` (HTTP POST), then call it. Requests without a valid Twilio signature get a 403.
+
+- **Test without a phone:** with the server running, `.venv/bin/python -m bookly.voice.loopback --phone +13125550142` plays the part of Twilio. It speaks scripted caller lines and prints time to first audio per turn. `--phone +14155550101` runs the clarifying-question script; `--silent` checks the silence reprompt and hang-up.
+- **What a call adds on top of the agent:** fixed lines (greeting, "Let me pull that up.", reprompt) are synthesized once at startup and play instantly. A filler line plays as soon as a tool round starts. After 8 s of silence the agent asks "Are you still there?" once, and after another 8 s it says goodbye and hangs up. Catalog titles and authors are sent to AssemblyAI as key terms.
+- **Logs:** each call writes `logs/call-<id>.jsonl` with every transcript turn, tool call, and a `voice_turn` timing per turn: speech-to-text delay, agent time, TTS first byte, and time to first audio. The end-of-call summary is printed by the server and logged as `call_end`.
+
+### Measured on the phone path
+
+Time to first audio runs from the end of the caller's speech to the first sound back. Measured on the server's audio clock; the loopback tester's own timing agreed to within ~80 ms.
+
+| Call | Median | Worst | Where the time goes |
+|---|---|---|---|
+| Real call (unknown caller: capabilities, FAQ, return, bad order number) | 1.78 s | 2.51 s | STT ~0.23 s · agent 1.3–2.4 s · TTS first byte ~0.17 s |
+| Loopback, James (status + tracking text) | 1.86 s | 2.15 s | Tool turn: filler at 1.75 s, answer at 3.1 s |
+| Loopback, Maya (clarifying question) | 1.84 s | 2.83 s | Worst turn: STT waited 1.3 s after a sentence ending in a book title |
+
+The agent's model time is the largest term. Streaming the first sentence to TTS (P2) is the next lever. Spoken order numbers make STT wait longer (1.4 s after "123456" on the real call); AssemblyAI's `min_latency` mode (`ASSEMBLYAI_MODE`) would shorten that at the risk of cutting off slow speakers.
+
+## Requirements map
+
+| Assignment requirement | Where to see it |
+|---|---|
+| Multi-turn interaction (collecting info before acting) | [return_credit_declined.md](docs/transcripts/return_credit_declined.md): book → reason → ZIP → credit offer → read-back → confirm → receipt. Also [unknown_caller.md](docs/transcripts/unknown_caller.md): order number → status → ZIP → cancel. |
+| Agent takes an action / uses a tool | Same two transcripts (`start_return`, `cancel_order`, `send_confirmation`), [happy_path.md](docs/transcripts/happy_path.md) (texts tracking), every transcript's tool lines. Gates tested offline in [tests/test_tools.py](tests/test_tools.py). |
+| Asks a clarifying question instead of answering | [multi_book_clarify.md](docs/transcripts/multi_book_clarify.md): three orders, so it asks which one by title + author before answering. Same on the phone: `bookly.voice.loopback --phone +14155550101`. |
+| Knows when to hand off | [angry_transfer.md](docs/transcripts/angry_transfer.md) and [outside_window.md](docs/transcripts/outside_window.md), with the structured handoff packet. |
+| Type or speak queries | Text: `bookly.cli`. Voice: call the Twilio number (phone mode above). |
+
+All six simulations are graded by code from the call log, state and database; the latest results are in [docs/transcripts/README.md](docs/transcripts/README.md).
+
+## Assumptions
+
+- **Identity:** the carrier's caller ID is enough to read order info. Anything that changes something also needs the ZIP on file (account or shipping ZIP). A number the caller says out loud is never treated as caller ID. No caller-ID match: order number (read access to that order only), then email as a last resort.
+- **Returns:** 30 days from delivery, one return per book. Store credit is added immediately; a refund goes to the original payment 5–7 business days after the book arrives. Processing orders are cancelled rather than returned.
+- **Escalation:** angry callers, repeat callers (2+ support contacts in 14 days), lost or damaged orders and out-of-policy requests go to a person with a structured summary.
+- **Mocks:** SMS and email are written to an `outbox` table and the tool log (A2P 10DLC isn't registered, so no real texts). The password reset is mocked. Data is seeded relative to today's date.
+- **Transfer (P1):** the agent says the handoff line, logs the handoff packet, and ends the call. The real Twilio transfer is P2.
+
+## How I built this
+
+Python with the Anthropic SDK and a hand-written tool loop; no agent framework. Twilio, AssemblyAI and Cartesia are called directly over their WebSocket APIs. I wrote it with Claude Code as a pair: I set the thesis, architecture, call flow and guardrails up front (see [CLAUDE.md](CLAUDE.md)) and reviewed each tier before moving on. Claude wrote most of the code, the procedures and the simulations, and checked API details against each vendor's current docs. Quality was checked by code-graded simulations (6 personas, re-run after every behavior change) and guardrail tests that run without the model. Latency was improved by measuring first (A/B in one run, configs interleaved), not guessing.
 
 ## Decisions log
 

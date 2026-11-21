@@ -3,31 +3,31 @@
 - **Persona:** `happy_path` · James Okafor · caller ID `+13125550142`
 - **Shows:** multi-turn, tool use (lookup_order, send_confirmation), caller-ID identification
 - **Result:** PASS (9/9 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1997 ms, max 2571 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1601 ms, max 2061 ms
 
 ## Transcript
 
 Tool calls appear in the order they ran. `[system]` calls are made by code, not the model.
 
-> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "James Okafor", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "419120", "placed_at": "2026-11-18", "items": [{"title": "Project Hail Mary", "author": "And…`
+> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "James Okafor", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "419120", "placed_at": "Wednesday, November 18th", "items": [{"title": "Project Hail Mary", …`
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
 **Caller:** Hey, yeah, I ordered Project Hail Mary a few days ago and I'm just wondering when it's gonna get here.
 
-**Bookly:** Your order with Project Hail Mary by Andy Weir shipped by USPS and should arrive Monday, November 23rd. Would you like me to text you the tracking number? _(1997 ms)_
+**Bookly:** Good news: your order with Project Hail Mary by Andy Weir shipped with USPS, and it should arrive Monday, November 23rd. Want me to text you the tracking number? _(1601 ms)_
 
-**Caller:** Oh nice, yeah, please text me the tracking number.
+**Caller:** Oh nice, yeah, please text me the tracking number. That'd be great.
 
 > `send_confirmation` `{"kind": "tracking", "channel": "sms", "order_number": "419120"}` → `{"status": "sent", "channel": "sms", "to": "***-***-0142", "mock": true, "note": "Delivery is mocked (written to the outbox)."}`
 
-**Bookly:** I've texted the tracking number to your phone number ending in 0 1 4 2. Can I help with anything else? _(2571 ms)_
+**Bookly:** I've texted the tracking number to your phone number ending in 0 1 4 2. Can I help with anything else? _(2061 ms)_
 
-**Caller:** Great, thanks. That's all I needed.
+**Caller:** Nope, that's all. Thanks a lot, bye!
 
-> `end_call` `{"reason": "resolved", "goodbye": "Thanks for calling Bookly, James, and enjoy Project Hail Mary!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
+> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, James. Enjoy Project Hail Mary, and have a great day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
 
-**Bookly:** Thanks for calling Bookly, James, and enjoy Project Hail Mary! _(1813 ms)_
+**Bookly:** You're welcome, James. Enjoy Project Hail Mary, and have a great day! _(1228 ms)_
 
 ## Checks
 
@@ -48,7 +48,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-happy_path",
-  "duration_s": 33.5,
+  "duration_s": 34.2,
   "caller_id": "+13125550142",
   "customer": "James Okafor",
   "identified_via": "caller_id",
@@ -60,8 +60,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 3,
   "tool_calls": 3,
   "latency_ms": {
-    "p50": 1997,
-    "max": 2571
+    "p50": 1601,
+    "max": 2061
   }
 }
 ```
