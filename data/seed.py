@@ -64,7 +64,7 @@ ITEMS = [
 ]
 
 
-def seed(path: Path | str) -> None:
+def seed(path: Path | str, demo_phone: str | None = None) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -75,6 +75,10 @@ def seed(path: Path | str) -> None:
         "INSERT INTO customers (id,name,phone,email,zip,recent_contacts) VALUES (?,?,?,?,?,?)",
         CUSTOMERS,
     )
+    if demo_phone:
+        # Live demo: calls from this number reach Maya Chen's account (3 orders, one with 2 books).
+        # Local database only; the number is never written to the repo.
+        conn.execute("UPDATE customers SET phone = ? WHERE id = 1", (demo_phone,))
     conn.executemany(
         "INSERT INTO orders (order_number,customer_id,status,placed_at,shipped_at,delivered_at,eta,carrier,tracking_number,ship_zip)"
         " VALUES (?,?,?,?,?,?,?,?,?,?)",
@@ -91,6 +95,7 @@ def seed(path: Path | str) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=str(DEFAULT_DB))
+    ap.add_argument("--demo-phone", help="Your cell in E.164 (+1...): calls from it reach Maya Chen's account")
     args = ap.parse_args()
-    seed(args.db)
-    print(f"Seeded {args.db}")
+    seed(args.db, demo_phone=args.demo_phone)
+    print(f"Seeded {args.db}" + (" (demo phone mapped to Maya Chen)" if args.demo_phone else ""))

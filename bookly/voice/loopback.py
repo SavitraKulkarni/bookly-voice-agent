@@ -41,6 +41,25 @@ SCRIPTS = {
         ("The one with two books in it, Klara and the Sun.", None),
         ("Great, that's all. Thank you, bye.", None),
     ]),
+    # The demo call script (docs: "Bookly Demo Call Script"): Maya, then the no-setup backup, Sofia.
+    "demo_maya": ("+14155550101", [
+        ("Hi, I'm calling to check on my order.", None),
+        ("The one with two books. Klara and the Sun was one of them.", None),
+        ("Great. Actually, I want to return Klara and the Sun. A friend gave me a copy for my birthday.", None),
+        ("Nine, four, one, one, zero.", None),
+        ("No thanks, I'd rather have a refund.", None),
+        ("Yes, go ahead.", None),
+        ("Text it to me, please.", None),
+        ("That's everything, thanks. Bye.", None),
+    ]),
+    "demo_sofia": ("+15125550199", [
+        ("Hi, I'm checking on an order I placed for Lessons in Chemistry.", None),
+        ("It's four, two, zero, zero, four, four.", None),
+        ("Oh good, then please cancel it. I found it at a local shop.", None),
+        ("One, one, two, one, five.", None),
+        ("Yes.", None),
+        ("Email is fine. That's all, thanks.", None),
+    ]),
     "angry": ("+16175550188", [
         ("This is the third time I'm calling. My book never showed up and nobody has fixed it!", None),
     ]),

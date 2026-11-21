@@ -40,6 +40,7 @@ PHRASES = {
     "filler_transfer": "Okay, one moment.",
     "reprompt": "Are you still there?",
     "silence_bye": "I haven't heard anything, so I'll end the call now. Thanks for calling Bookly. Goodbye.",
+    "tts_down": "I'm sorry, I'm having trouble with my voice line right now. Please call back in a few minutes. Goodbye.",
 }
 _phrase_audio: dict[str, bytes] = {}
 
@@ -85,7 +86,12 @@ async def load_phrases() -> None:
     await tts.start()
     try:
         for key, text in PHRASES.items():
-            _phrase_audio[key] = await tts.synth(text)
+            try:
+                _phrase_audio[key] = await tts.synth(text)
+            except Exception as e:  # keep serving: a missing fixed line is skipped, not fatal
+                if key == "greeting":
+                    raise
+                print(f"[server] could not pre-synthesize {key!r}: {e}")
     finally:
         await tts.close()
 
@@ -136,6 +142,7 @@ class CallSession:
         self.interrupted = False              # current turn was cut off by the caller
         self.tts_ctx: str | None = None       # Cartesia context currently generating
         self.barge_ins = 0
+        self.tts_failed = False
         self._mark_n = 0
 
     # ---- lifecycle --------------------------------------------------------
@@ -224,18 +231,27 @@ class CallSession:
         if self.interrupted or not text.strip():
             return
         self._cancel_silence_timer()
+        if self.tts_failed:
+            return
         ctx = self.tts_ctx = uuid.uuid4().hex
         t_req = time.monotonic()
         first = True
-        async for chunk in self.tts.stream(text, ctx=ctx):
-            if self.interrupted:
-                break
-            if first:
-                if self.turn is not None and "tts_ttfb_ms" not in self.turn:
-                    self.turn["tts_ttfb_ms"] = round((time.monotonic() - t_req) * 1000)
-                self._first_audio("answer")
-                first = False
-            await self._send_audio(chunk)
+        try:
+            async for chunk in self.tts.stream(text, ctx=ctx):
+                if self.interrupted:
+                    break
+                if first:
+                    if self.turn is not None and "tts_ttfb_ms" not in self.turn:
+                        self.turn["tts_ttfb_ms"] = round((time.monotonic() - t_req) * 1000)
+                    self._first_audio("answer")
+                    first = False
+                await self._send_audio(chunk)
+        except Exception as e:  # e.g. TTS credits or outage: never leave the caller in silence
+            self.tts_failed = True
+            self.tts_ctx = None
+            self.log.event("tts_error", error=type(e).__name__, message=str(e)[:300])
+            print(f"[tts error] {self.agent.call_id}: {str(e)[:160]}")
+            return
         self.tts_ctx = None
         if not self.interrupted:
             await self._mark("s", text)
@@ -322,6 +338,13 @@ class CallSession:
                 q.put_nowait(None)
                 await speaker
                 self._record_turn()
+                if self.tts_failed:
+                    # Can't speak answers: say the pre-made line (if we have it) and end cleanly.
+                    if "tts_down" in _phrase_audio:
+                        await self._play(_phrase_audio["tts_down"], "tts_down", PHRASES["tts_down"])
+                    self.agent.state.end_reason = self.agent.state.end_reason or "end:tts_error"
+                    await self._hang_up("tts_error")
+                    return
                 if reply.ended:
                     await self._finish(reply)
                     return
