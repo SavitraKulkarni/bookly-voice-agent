@@ -26,7 +26,8 @@ class STTStream:
     """
 
     def __init__(self, keyterms: list[str], on_final: Callable[[str, dict], Awaitable[None]],
-                 on_speech: Callable[[], Awaitable[None]]):
+                 on_speech: Callable[[], Awaitable[None]],
+                 on_partial: Callable[[str], Awaitable[None]] | None = None):
         params = {
             "sample_rate": 8000,
             "encoding": "pcm_mulaw",
@@ -35,7 +36,8 @@ class STTStream:
             "keyterms_prompt": json.dumps([k for k in keyterms if len(k) <= 50][:100]),
         }
         self.url = f"{URL}?{urlencode(params)}"
-        self.on_final, self.on_speech = on_final, on_speech
+        self.on_final, self.on_speech, self.on_partial = on_final, on_speech, on_partial
+        self.partials = 0
         self.ws = None
         self.buf = bytearray()
         self.audio_bytes = 0                  # caller audio received so far (8000 bytes = 1 s)
@@ -65,9 +67,13 @@ class STTStream:
                 await self.on_speech()
             elif t == "Turn":
                 if not msg.get("end_of_turn"):
-                    if msg.get("transcript") and msg.get("turn_order") != self._last_partial_order:
-                        self._last_partial_order = msg.get("turn_order")
-                        await self.on_speech()
+                    if msg.get("transcript"):
+                        self.partials += 1
+                        if msg.get("turn_order") != self._last_partial_order:
+                            self._last_partial_order = msg.get("turn_order")
+                            await self.on_speech()
+                        if self.on_partial:
+                            await self.on_partial(msg["transcript"])
                     continue
                 text = (msg.get("transcript") or "").strip()
                 if not text:

@@ -4,7 +4,7 @@ A voice customer-support agent for Bookly, a fictional online bookstore. Built f
 
 > **Thesis:** A great CX agent knows its boundaries: it resolves what it can with grounded tool calls, asks when it's unsure, and hands off cleanly when it shouldn't decide.
 
-**Status:** text mode, simulations (P0) and phone mode (P1) work end to end. Streaming sentence-by-sentence, barge-in and a real transfer (P2) are next.
+**Status:** text mode, simulations (P0) and phone mode (P1) work end to end. P2 adds streaming replies, barge-in, and a real transfer to a person with a spoken summary (the transfer is built and tested up to the dial, but hasn't been run on a live call: the Twilio redirect and the whisper to the person answering are untested end to end).
 
 ```
 Caller → Twilio media stream (8 kHz μ-law) → AssemblyAI streaming STT
@@ -41,7 +41,9 @@ ngrok http --url=$PUBLIC_HOST 8080
 Point the Twilio number's Voice webhook at `https://$PUBLIC_HOST/voice` (HTTP POST), then call it. Requests without a valid Twilio signature get a 403.
 
 - **Test without a phone:** with the server running, `.venv/bin/python -m bookly.voice.loopback --phone +13125550142` plays the part of Twilio. It speaks scripted caller lines and prints time to first audio per turn. `--phone +14155550101` runs the clarifying-question script; `--silent` checks the silence reprompt and hang-up.
-- **What a call adds on top of the agent:** fixed lines (greeting, "Let me pull that up.", reprompt) are synthesized once at startup and play instantly. A filler line plays as soon as a tool round starts. After 8 s of silence the agent asks "Are you still there?" once, and after another 8 s it says goodbye and hangs up. Catalog titles and authors are sent to AssemblyAI as key terms.
+- **What a call adds on top of the agent:** fixed lines (greeting, "Let me pull that up.", reprompt) are synthesized once at startup and play instantly. A filler line plays the moment the model starts a tool call, before its arguments are even written. Claude's reply is streamed and each sentence goes to Cartesia as soon as it's complete.
+- **Barge-in:** if the caller says two or more words while the agent is talking, playback stops (Twilio `clear`), the in-flight TTS is cancelled, the rest of the reply is dropped, and the next turn's call-state note tells the agent exactly what the caller did and didn't hear.
+- **Transfer:** with `TRANSFER_NUMBER` set, a handoff redirects the live call to that number (caller ID shows the Bookly number). Before the caller is connected, the person answering hears a whisper with the structured summary (who, how verified, reason, what they want, order, what was checked), so the caller never repeats themselves. Without it, the agent says the handoff line and ends the call. After 8 s of silence the agent asks "Are you still there?" once, and after another 8 s it says goodbye and hangs up. Catalog titles and authors are sent to AssemblyAI as key terms.
 - **Logs:** each call writes `logs/call-<id>.jsonl` with every transcript turn, tool call, and a `voice_turn` timing per turn: speech-to-text delay, agent time, TTS first byte, and time to first audio. The end-of-call summary is printed by the server and logged as `call_end`.
 
 ### Measured on the phone path
@@ -54,7 +56,13 @@ Time to first audio runs from the end of the caller's speech to the first sound 
 | Loopback, James (status + tracking text) | 1.86 s | 2.15 s | Tool turn: filler at 1.75 s, answer at 3.1 s |
 | Loopback, Maya (clarifying question) | 1.84 s | 2.83 s | Worst turn: STT waited 1.3 s after a sentence ending in a book title |
 
-The agent's model time is the largest term. Streaming the first sentence to TTS (P2) is the next lever. Spoken order numbers make STT wait longer (1.4 s after "123456" on the real call); AssemblyAI's `min_latency` mode (`ASSEMBLYAI_MODE`) would shorten that at the risk of cutting off slow speakers.
+The agent's model time is the largest term. What P2 changed, measured with the loopback tester and the server log:
+
+| Change | Result |
+|---|---|
+| Filler starts when a tool call *begins* (streaming), not after the model finishes writing it | Tool turns: first sound 0.84 s (was 1.3–1.75 s). Angry-caller transfer: first sound 1.2 s (was 4.5 s of silence while the model wrote the handoff summary). |
+| Stream the reply to TTS sentence by sentence | No measurable gain: 1.74 s vs 1.75 s median, 12 turns each, interleaved. Replies are one or two short sentences, so the first sentence ends close to when the reply does. Kept on (helps longer replies; lets barge-in skip unsynthesized sentences). |
+| Cartesia continuation contexts (send text fragments as they stream) | Tested in isolation: first audio 438 ms after text starts vs 603 ms for whole sentences, with a 300 ms buffer (0 ms buffer: word-by-word with long gaps, unusable). ~165 ms for a second code path; not adopted. | Spoken order numbers make STT wait longer (1.4 s after "123456" on the real call); AssemblyAI's `min_latency` mode (`ASSEMBLYAI_MODE`) would shorten that at the risk of cutting off slow speakers.
 
 ## Requirements map
 
@@ -74,7 +82,7 @@ All six simulations are graded by code from the call log, state and database; th
 - **Returns:** 30 days from delivery, one return per book. Store credit is added immediately; a refund goes to the original payment 5–7 business days after the book arrives. Processing orders are cancelled rather than returned.
 - **Escalation:** angry callers, repeat callers (2+ support contacts in 14 days), lost or damaged orders and out-of-policy requests go to a person with a structured summary.
 - **Mocks:** SMS and email are written to an `outbox` table and the tool log (A2P 10DLC isn't registered, so no real texts). The password reset is mocked. Data is seeded relative to today's date.
-- **Transfer (P1):** the agent says the handoff line, logs the handoff packet, and ends the call. The real Twilio transfer is P2.
+- **Transfer:** a real Twilio redirect to `TRANSFER_NUMBER` with a whispered summary for the person answering. In text mode and simulations the handoff packet is logged instead. If no specialist answers within 25 s, the caller hears a callback message.
 
 ## How I built this
 
@@ -132,3 +140,9 @@ Each entry: what I chose, what it costs, and why it was worth it.
   † The one miss was an over-strict check (the agent named the right book, "Klara and the Sun", but the check wanted the other title). The check was widened and the final run passed 6/6.
 - **Trade-off:** Prefetch makes each call ~0.25 s slower (bigger state note, more to read) and costs ~$0.004 more per conversation; the saved round trips more than pay it back. The model also sees statuses before it asks "which order?". The clarifying-question simulation checks it still asks first (3/3 in the A/B, plus the final run).
 - **Not yet measured:** each change alone, and effort `high`. The biggest remaining lever for callers is in phone mode: a filler line during tool calls and streaming the first sentence to TTS, measured as time to first audio.
+
+### 7. On the phone, the wait people feel beats the total wait
+- **Finding:** Once round trips were cut (decision 6), the biggest remaining silence was the time the model spends *writing a tool call*: the agent can't speak until the call is complete, and a handoff summary is long. Streaming the spoken reply didn't help, because replies are short.
+- **Choice:** Stream every model call and start the filler line the moment a tool call begins. Pre-synthesize every fixed line. Keep sentence-level streaming to TTS. Barge-in on two or more words.
+- **Measured:** first sound on tool turns 0.84 s (was 1.3–1.75 s); transfer turn 1.2 s (was 4.5 s). Streaming to TTS: no measurable change (1.74 s vs 1.75 s, 12 turns each).
+- **Trade-off:** A filler can play even when the tool call turns out to be fast, and barge-in can fire on background speech (the two-word minimum is the guard). The model is told what the caller didn't hear, so a cut-off answer isn't lost.

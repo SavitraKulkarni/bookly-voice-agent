@@ -2,12 +2,14 @@
 
 Connects to the running server's /media WebSocket, speaks scripted caller
 lines (synthesized by Cartesia, streamed in real time with background
-silence like a real call), echoes playback marks, and measures time to first
+silence like a real call), plays back agent audio on a simulated clock,
+echoes playback marks, honours "clear" (barge-in), and measures time to first
 audio: from the end of the caller's speech to the first agent audio back.
-This includes STT endpointing, the agent, and TTS: everything but the phone network.
 
-    .venv/bin/python -m bookly.voice.server &
     .venv/bin/python -m bookly.voice.loopback --phone +13125550142
+    .venv/bin/python -m bookly.voice.loopback --script barge          # talk over the agent
+    .venv/bin/python -m bookly.voice.loopback --silent                # reprompt + hang-up
+    .venv/bin/python -m bookly.voice.loopback --ab-streaming 2        # streaming on vs off, interleaved
 """
 from __future__ import annotations
 
@@ -25,17 +27,28 @@ from bookly.voice.tts import TTS
 
 FRAME = 160          # 20 ms of 8 kHz mu-law, what Twilio sends
 SILENCE = b"\xff" * FRAME
+
+# Each line: (text, interrupt_after_s). None = wait for the agent to finish first;
+# a number = start talking that many seconds after the agent starts answering the previous line.
 SCRIPTS = {
-    "+13125550142": [  # James: happy path, order status + tracking text
-        "Hi, I'm calling about my order of Project Hail Mary. When will it get here?",
-        "Yes please, text me the tracking number.",
-        "No, that's everything. Thanks, bye.",
-    ],
-    "+14155550101": [  # Maya: clarifying question
-        "Hi, I'm calling to check on my order.",
-        "The one with two books in it, Klara and the Sun.",
-        "Great, that's all. Thank you, bye.",
-    ],
+    "happy": ("+13125550142", [
+        ("Hi, I'm calling about my order of Project Hail Mary. When will it get here?", None),
+        ("Yes please, text me the tracking number.", None),
+        ("No, that's everything. Thanks, bye.", None),
+    ]),
+    "clarify": ("+14155550101", [
+        ("Hi, I'm calling to check on my order.", None),
+        ("The one with two books in it, Klara and the Sun.", None),
+        ("Great, that's all. Thank you, bye.", None),
+    ]),
+    "angry": ("+16175550188", [
+        ("This is the third time I'm calling. My book never showed up and nobody has fixed it!", None),
+    ]),
+    "barge": ("+13125550142", [
+        ("Hi, when will my Project Hail Mary order get here?", None),
+        ("Sorry, actually, can you just text me the tracking number?", 1.2),
+        ("No, that's all. Thanks, bye.", None),
+    ]),
 }
 
 
@@ -44,15 +57,23 @@ class FakeTwilio:
         self.ws = ws
         self.speaking = False
         self.speech: list[bytes] = []
-        self.play_until = 0.0          # when our simulated phone finishes playing agent audio
+        self.play_until = 0.0
         self.last_media_at = 0.0
         self.first_media_after: float | None = None
         self.waiting_since: float | None = None
-        self.agent_audio_bytes = 0
+        self.pending_marks: dict[str, asyncio.TimerHandle] = {}
+        self.clears = 0
         self.closed = asyncio.Event()
 
     async def send(self, obj):
-        await self.ws.send(json.dumps(obj))
+        try:
+            await self.ws.send(json.dumps(obj))
+        except Exception:
+            self.closed.set()
+
+    def _echo_mark(self, name: str):
+        self.pending_marks.pop(name, None)
+        asyncio.ensure_future(self.send({"event": "mark", "streamSid": "MZloop", "mark": {"name": name}}))
 
     async def uplink(self):
         """Stream caller audio continuously (speech when talking, silence otherwise), real-time paced."""
@@ -75,90 +96,152 @@ class FakeTwilio:
                 now = time.monotonic()
                 if msg["event"] == "media":
                     audio = base64.b64decode(msg["media"]["payload"])
-                    self.agent_audio_bytes += len(audio)
                     self.play_until = max(self.play_until, now) + len(audio) / 8000
                     self.last_media_at = now
                     if self.waiting_since and self.first_media_after is None:
                         self.first_media_after = now
                 elif msg["event"] == "mark":
-                    delay = max(0.0, self.play_until - now)
-                    asyncio.get_running_loop().call_later(
-                        delay, lambda n=msg["mark"]["name"]: asyncio.ensure_future(
-                            self.send({"event": "mark", "streamSid": "MZloop", "mark": {"name": n}})))
+                    name = msg["mark"]["name"]
+                    self.pending_marks[name] = asyncio.get_running_loop().call_later(
+                        max(0.0, self.play_until - now), self._echo_mark, name)
+                elif msg["event"] == "clear":  # Twilio drops buffered audio and returns pending marks
+                    self.clears += 1
+                    self.play_until = now
+                    for name, h in list(self.pending_marks.items()):
+                        h.cancel()
+                        self._echo_mark(name)
         except Exception:
             pass
         self.closed.set()
 
-    async def agent_idle(self, quiet_s: float = 1.5, timeout: float = 40, expect_reply: bool = True):
+    async def wait_reply_start(self, timeout: float = 40):
         end = time.monotonic() + timeout
-        while expect_reply and self.first_media_after is None and time.monotonic() < end \
-                and not self.closed.is_set():
-            await asyncio.sleep(0.02)   # agent hasn't started answering yet
+        while self.first_media_after is None and time.monotonic() < end and not self.closed.is_set():
+            await asyncio.sleep(0.02)
+
+    async def agent_idle(self, quiet_s: float = 1.5, timeout: float = 40):
+        await self.wait_reply_start(timeout)
+        end = time.monotonic() + timeout
         while time.monotonic() < end and not self.closed.is_set():
             now = time.monotonic()
             if now > self.play_until + quiet_s and now - self.last_media_at > quiet_s:
                 return
             await asyncio.sleep(0.1)
 
+    async def say(self, audio: bytes):
+        self.speech = [audio[i:i + FRAME] for i in range(0, len(audio), FRAME)]
+        self.speaking = True
+        while self.speaking and not self.closed.is_set():
+            await asyncio.sleep(0.02)
 
-async def main_async(url: str, phone: str, lines: list[str]):
-    caller_audio = []
-    if lines:
-        tts = TTS()
-        await tts.start()
-        caller_audio = [await tts.synth(line) for line in lines]
-        await tts.close()
 
-    results = []
+async def run_call(url: str, phone: str, lines: list[tuple[str, float | None]], audio: list[bytes],
+                   streaming: str | None = None, quiet: bool = False) -> dict:
+    out = {"ttfa": [], "clears": 0, "hung_up_after_s": None}
+    log = (lambda *a: None) if quiet else print
     async with connect(url, max_size=None) as ws:
         tw = FakeTwilio(ws)
+        params = {"caller": phone}
+        if streaming is not None:
+            params["streaming"] = streaming
         await tw.send({"event": "connected", "protocol": "Call", "version": "1.0.0"})
         await tw.send({"event": "start", "streamSid": "MZloop",
-                       "start": {"streamSid": "MZloop", "callSid": f"CAloop{int(time.time())}",
-                                 "customParameters": {"caller": phone}}})
+                       "start": {"streamSid": "MZloop", "callSid": f"CAloop{time.time_ns()}",
+                                 "customParameters": params}})
         up, down = asyncio.create_task(tw.uplink()), asyncio.create_task(tw.downlink())
         tw.waiting_since = time.monotonic()
-        await tw.agent_idle()                       # greeting
-        print("greeting played")
-        for line, audio in zip(lines, caller_audio):
-            if tw.closed.is_set():
-                break
-            tw.speech = [audio[i:i + FRAME] for i in range(0, len(audio), FRAME)]
-            tw.speaking = True
-            print(f"caller: {line}")
-            while tw.speaking:
-                await asyncio.sleep(0.02)
-            await tw.agent_idle()
-            ttfa = round((tw.first_media_after - tw.waiting_since) * 1000) if tw.first_media_after else None
-            results.append(ttfa)
-            print(f"   time to first audio: {ttfa} ms")
+        await tw.agent_idle()
+        log("greeting played")
+        i = 0
+        while i < len(lines) and not tw.closed.is_set():
+            text, _ = lines[i]
+            await tw.say(audio[i])
+            log(f"caller: {text}")
+            nxt = lines[i + 1] if i + 1 < len(lines) else None
+            if nxt and nxt[1] is not None:       # next line interrupts this reply
+                await tw.wait_reply_start()
+                ttfa = round((tw.first_media_after - tw.waiting_since) * 1000) if tw.first_media_after else None
+                out["ttfa"].append(ttfa)
+                log(f"   time to first audio: {ttfa} ms; interrupting in {nxt[1]} s")
+                await asyncio.sleep(nxt[1])
+            else:
+                await tw.agent_idle()
+                ttfa = round((tw.first_media_after - tw.waiting_since) * 1000) if tw.first_media_after else None
+                out["ttfa"].append(ttfa)
+                log(f"   time to first audio: {ttfa} ms")
+            i += 1
         if not lines:  # silent caller: wait for the server to hang up on us
             t0 = time.monotonic()
             try:
                 await asyncio.wait_for(tw.closed.wait(), timeout=45)
-                print(f"server hung up {time.monotonic() - t0:.1f} s after the greeting finished")
+                out["hung_up_after_s"] = round(time.monotonic() - t0, 1)
+                log(f"server hung up {out['hung_up_after_s']} s after the greeting finished")
             except asyncio.TimeoutError:
-                print("server did NOT hang up within 45 s")
+                log("server did NOT hang up within 45 s")
         await asyncio.sleep(1)
         if not tw.closed.is_set():
             await tw.send({"event": "stop", "streamSid": "MZloop"})
+        out["clears"] = tw.clears
         up.cancel()
         down.cancel()
-    vals = [r for r in results if r is not None]
-    if vals:
-        print(f"time to first audio (end of caller speech -> first agent audio): "
-              f"p50 {int(statistics.median(vals))} ms, max {max(vals)} ms over {len(vals)} turns")
-    print("Server-side breakdown is in the call log (voice_turn events) in logs/.")
+    return out
+
+
+async def synth_lines(lines):
+    if not lines:
+        return []
+    tts = TTS()
+    await tts.start()
+    try:
+        return [await tts.synth(t) for t, _ in lines]
+    finally:
+        await tts.close()
+
+
+def _stats(xs):
+    xs = [x for x in xs if x is not None]
+    return f"p50 {int(statistics.median(xs))} ms, max {max(xs)} ms, n={len(xs)}" if xs else "no data"
+
+
+async def main_async(args):
+    if args.ab_streaming:
+        jobs = []
+        for r in range(args.ab_streaming):
+            for name in ("happy", "clarify"):
+                for streaming in ("1", "0") if r % 2 == 0 else ("0", "1"):
+                    jobs.append((name, streaming))
+        audio = {n: await synth_lines(SCRIPTS[n][1]) for n in ("happy", "clarify")}
+        sem = asyncio.Semaphore(4)
+
+        async def one(name, streaming):
+            async with sem:
+                phone, lines = SCRIPTS[name]
+                return streaming, await run_call(args.url, phone, lines, audio[name], streaming, quiet=True)
+        results = await asyncio.gather(*(one(n, s) for n, s in jobs))
+        for s in ("0", "1"):
+            vals = [v for st, r in results if st == s for v in r["ttfa"]]
+            print(f"streaming={'on ' if s == '1' else 'off'}  time to first audio: {_stats(vals)}")
+        print("Per-turn server breakdown: voice_turn events in logs/call-*.jsonl")
+        return
+    if args.silent:
+        lines, phone = [], args.phone or "+13125550142"
+    else:
+        phone, lines = SCRIPTS[args.script]
+        phone = args.phone or phone
+    out = await run_call(args.url, phone, lines, await synth_lines(lines))
+    print(f"time to first audio (end of caller speech -> first agent audio): {_stats(out['ttfa'])}; "
+          f"clear events: {out['clears']}")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="ws://localhost:8080/media")
-    ap.add_argument("--phone", default="+13125550142")
+    ap.add_argument("--script", choices=sorted(SCRIPTS), default="happy")
+    ap.add_argument("--phone", help="Override the script's caller ID")
     ap.add_argument("--silent", action="store_true", help="Say nothing: expect one reprompt, then goodbye + hang-up")
-    args = ap.parse_args()
-    lines = [] if args.silent else SCRIPTS.get(args.phone, SCRIPTS["+13125550142"])
-    asyncio.run(main_async(args.url, args.phone, lines))
+    ap.add_argument("--ab-streaming", type=int, metavar="ROUNDS",
+                    help="Run happy + clarify with streaming on and off, interleaved, ROUNDS times")
+    asyncio.run(main_async(ap.parse_args()))
 
 
 if __name__ == "__main__":

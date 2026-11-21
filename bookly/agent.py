@@ -109,6 +109,13 @@ class Agent:
         return GREETING
 
     def _snapshot(self) -> str:
+        note = self._snapshot_body()
+        if self.state.interruption_note:
+            note += "\n" + self.state.interruption_note
+            self.state.interruption_note = None
+        return note
+
+    def _snapshot_body(self) -> str:
         st = self.state
         summaries = None
         if st.verified_customer and st.identified_via in ("caller_id", "email"):
@@ -139,7 +146,9 @@ class Agent:
                        selected_order=self.state.selected_order)
         return result, is_error
 
-    def _create(self):
+    def _create(self, on_text: Callable[[str], None] | None = None):
+        """One model call. With on_text, stream it and hand text deltas over as they arrive
+        (phone mode speaks them sentence by sentence); otherwise a plain request."""
         kwargs: dict[str, Any] = dict(
             model=self.model,
             max_tokens=16000,
@@ -150,15 +159,33 @@ class Agent:
             cache_control={"type": "ephemeral"},
         )
         if self.fallback:
-            return client().beta.messages.create(
-                betas=["server-side-fallback-2026-07-01"], fallbacks="default", **kwargs
-            )
-        return client().messages.create(**kwargs)
+            api, kwargs = client().beta.messages, {**kwargs, "betas": ["server-side-fallback-2026-07-01"],
+                                                  "fallbacks": "default"}
+        else:
+            api = client().messages
+        if not on_text:
+            return api.create(**kwargs), None
+        t0 = time.monotonic()
+        first_text_ms = None
+        with api.stream(**kwargs) as stream:
+            for event in stream:
+                if event.type == "content_block_start" and event.content_block.type == "tool_use":
+                    self._tool_starting(event.content_block.name)  # before its arguments are written
+                elif event.type == "content_block_delta" and event.delta.type == "text_delta" and event.delta.text:
+                    if first_text_ms is None:
+                        first_text_ms = round((time.monotonic() - t0) * 1000)
+                    on_text(event.delta.text)
+                elif event.type == "content_block_stop" and first_text_ms is not None:
+                    on_text("\n")  # block boundary = sentence boundary for the speaker
+            return stream.get_final_message(), first_text_ms
 
     # ------------------------------------------------------------------
-    def handle_turn(self, caller_text: str) -> Reply:
+    def handle_turn(self, caller_text: str, on_text: Callable[[str], None] | None = None) -> Reply:
+        """Run one caller turn. on_text (phone mode) receives everything the caller should hear,
+        as it's produced: streamed model text, a terminal tool's closing line, or a fallback line."""
         if self.state.ended:
             return Reply(text="", ended=True, handoff=self.state.handoff)
+        self._on_text = on_text
         t_turn = time.monotonic()
         st = self.state
         st.caller_turns += 1
@@ -172,19 +199,20 @@ class Agent:
         tools_used: list[str] = []
         model_ms = tools_ms = 0
         rounds = 0
-        filler_sent = False
+        self._filler_sent = False
 
         while True:
             t0 = time.monotonic()
             try:
-                resp = self._create()
+                resp, first_text_ms = self._create(on_text)
             except anthropic.APIError as e:
                 self.log.event("model_error", error=type(e).__name__, message=str(e)[:500])
                 return self._fail_safe(t_turn, tools_used, f"model_error:{type(e).__name__}")
             ms = round((time.monotonic() - t0) * 1000)
             model_ms += ms
             u = resp.usage
-            self.log.event("model_call", ms=ms, stop_reason=resp.stop_reason, model=resp.model,
+            self.log.event("model_call", ms=ms, first_text_ms=first_text_ms, stop_reason=resp.stop_reason,
+                           model=resp.model,
                            input_tokens=u.input_tokens, output_tokens=u.output_tokens,
                            cache_read=getattr(u, "cache_read_input_tokens", None),
                            cache_write=getattr(u, "cache_creation_input_tokens", None))
@@ -203,9 +231,8 @@ class Agent:
             if rounds > MAX_TOOL_ROUNDS:
                 self.log.event("loop_limit", rounds=rounds)
                 return self._fail_safe(t_turn, tools_used, "tool_loop_limit")
-            if self.on_tool_start and not filler_sent:
-                self.on_tool_start([b.name for b in tool_uses])  # phone mode: "Let me pull that up."
-                filler_sent = True
+            for b in tool_uses:
+                self._tool_starting(b.name)  # no-op if streaming already announced it
 
             results = []
             for b in tool_uses:
@@ -219,6 +246,8 @@ class Agent:
             if self.terminal_say and st.ended and st.closing_line:
                 # The terminal tool carried the spoken line: no follow-up model call needed.
                 spoken.append(st.closing_line)
+                if on_text:
+                    on_text(st.closing_line + "\n")
                 break
 
         text = " ".join(spoken).strip()
@@ -226,10 +255,18 @@ class Agent:
             text = ("I'm connecting you with a specialist now." if st.handoff
                     else "Thanks for calling Bookly. Goodbye!" if st.ended
                     else "Sorry, could you say that again?")
+            if on_text:
+                on_text(text + "\n")
         latency = round((time.monotonic() - t_turn) * 1000)
         self.log.event("agent_turn", text=text, latency_ms=latency, model_ms=model_ms, tools_ms=tools_ms,
                        tool_rounds=rounds, ended=st.ended)
         return Reply(text=text, ended=st.ended, handoff=st.handoff, latency_ms=latency, tools_used=tools_used)
+
+    def _tool_starting(self, name: str) -> None:
+        """Tell the transport a tool round is starting (phone mode plays a filler line), once per turn."""
+        if self.on_tool_start and not self._filler_sent:
+            self._filler_sent = True
+            self.on_tool_start([name])
 
     def _fail_safe(self, t_turn: float, tools_used: list[str], why: str) -> Reply:
         """Anything unexpected: don't improvise, hand off with what we know."""
@@ -238,6 +275,8 @@ class Agent:
                 "reason": "other", "caller_wants": "unknown (assistant error)",
                 "summary": f"Assistant could not continue ({why}). See call log {self.call_id}.",
             }, source="system")
+        if getattr(self, "_on_text", None):
+            self._on_text(FALLBACK_LINE + "\n")
         latency = round((time.monotonic() - t_turn) * 1000)
         self.log.event("agent_turn", text=FALLBACK_LINE, latency_ms=latency, model_ms=0, tools_ms=0,
                        tool_rounds=0, ended=True, fail_safe=why)

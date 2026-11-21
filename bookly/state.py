@@ -43,6 +43,7 @@ class CallState:
     ended: bool = False
     end_reason: str | None = None
     handoff: dict[str, Any] | None = None
+    interruption_note: str | None = None     # phone mode: caller talked over the last reply
     closing_line: str | None = None          # spoken line carried by a terminal tool (end_call / transfer)
 
     # ---- helpers used by tools -------------------------------------------

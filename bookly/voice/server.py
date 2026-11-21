@@ -19,7 +19,7 @@ from fastapi.responses import PlainTextResponse, Response
 from twilio.request_validator import RequestValidator
 
 import bookly.agent  # noqa: F401  (loads .env on import)
-from bookly.voice.call import CallSession, load_phrases
+from bookly.voice.call import HANDOFFS, CallSession, load_phrases, whisper_twiml
 
 PORT = int(os.environ.get("PORT", "8080"))
 
@@ -57,6 +57,27 @@ async def voice(request: Request):
     return Response(content=twiml, media_type="application/xml")
 
 
+def _twilio_signed(request: Request, form: dict) -> bool:
+    token = os.environ.get("TWILIO_AUTH_TOKEN")
+    if not token:
+        return True
+    host = os.environ.get("PUBLIC_HOST", "").strip()
+    url = f"https://{host}{request.url.path}" + (f"?{request.url.query}" if request.url.query else "")
+    return RequestValidator(token).validate(url, form, request.headers.get("X-Twilio-Signature", ""))
+
+
+@app.post("/whisper")
+async def whisper(request: Request):
+    """Played to the specialist before the caller is connected: the structured handoff summary."""
+    form = dict(await request.form())
+    if not _twilio_signed(request, form):
+        return PlainTextResponse("invalid signature", status_code=403)
+    print(f"[whisper] requested for call ...{request.query_params.get('call', '')[-6:]}")
+    packet = HANDOFFS.pop(request.query_params.get("call", ""), None) or {
+        "reason": "other", "caller_wants": "unknown", "summary": "No summary was found for this call."}
+    return Response(content=whisper_twiml(packet), media_type="application/xml")
+
+
 @app.websocket("/media")
 async def media(ws: WebSocket):
     await ws.accept()
@@ -69,6 +90,10 @@ async def media(ws: WebSocket):
                 st = msg["start"]
                 caller = (st.get("customParameters") or {}).get("caller") or None
                 session = CallSession(ws, st["streamSid"], st.get("callSid", st["streamSid"]), caller)
+                # Test hook for the loopback A/B. Only reachable over the WebSocket: real calls get their
+                # parameters from our own TwiML, which never sets it.
+                if (st.get("customParameters") or {}).get("streaming") in ("0", "1"):
+                    session.streaming = st["customParameters"]["streaming"] == "1"
                 print(f"[call start] {session.agent.call_id} caller={caller}")
                 await session.start()
             elif ev == "media" and session and msg["media"].get("track", "inbound") == "inbound":

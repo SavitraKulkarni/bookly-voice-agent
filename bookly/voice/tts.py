@@ -45,9 +45,9 @@ class TTS:
             if msg.get("done") or msg.get("type") in ("done", "error"):
                 await q.put(None)
 
-    async def stream(self, text: str) -> AsyncIterator[bytes]:
+    async def stream(self, text: str, ctx: str | None = None) -> AsyncIterator[bytes]:
         """Yield mu-law audio chunks for `text` as Cartesia produces them."""
-        ctx = uuid.uuid4().hex
+        ctx = ctx or uuid.uuid4().hex
         q: asyncio.Queue = asyncio.Queue()
         self.queues[ctx] = q
         await self.ws.send(json.dumps({
@@ -64,6 +64,17 @@ class TTS:
                 yield item
         finally:
             self.queues.pop(ctx, None)
+
+    async def cancel(self, ctx: str) -> None:
+        """Barge-in: stop generating this context and end its stream."""
+        q = self.queues.get(ctx)
+        if q is None:
+            return
+        try:
+            await self.ws.send(json.dumps({"context_id": ctx, "cancel": True}))
+        except Exception:
+            pass
+        await q.put(None)
 
     async def synth(self, text: str) -> bytes:
         return b"".join([c async for c in self.stream(text)])

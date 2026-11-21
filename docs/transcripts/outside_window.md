@@ -3,7 +3,7 @@
 - **Persona:** `outside_window` · Daniel Reyes · caller ID `+12065550177`
 - **Shows:** policy stated without negotiating, escalation with structured handoff
 - **Result:** PASS (9/9 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 2746 ms, max 3481 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 2576 ms, max 3756 ms
 
 ## Transcript
 
@@ -13,15 +13,15 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hi, yeah, I'd like to return a book I bought, The Name of the Wind by Patrick Rothfuss. I just didn't really like it.
+**Caller:** Hi, yeah, I'd like to return a book I bought. It's The Name of the Wind by Patrick Rothfuss, I just didn't really like it.
 
-**Bookly:** I see The Name of the Wind by Patrick Rothfuss on order 4 1 6 8 8 1. It was delivered on Wednesday, September 30th, so it's past our 30-day return window, which ended Friday, October 30th. Would you like me to transfer you to a specialist? _(2011 ms)_
+**Bookly:** I found it, order 4 1 6 8 8 1 with The Name of the Wind by Patrick Rothfuss. It was delivered on Wednesday, September 30th, which is past our 30-day return window. Would you like me to transfer you to a specialist? _(1396 ms)_
 
-**Caller:** Oh, it's only a few weeks late, can't you make an exception?
+**Caller:** It's only a few weeks late, can't you make an exception?
 
-> `transfer_to_human` `{"reason": "outside_policy", "caller_wants": "To return The Name of the Wind by Patrick Rothfuss as an exception to the 30-day return window.", "order_number": …` → `{"status": "transferring", "instruction": "Tell the caller in one sentence that you're connecting them with a specialist who will have these details, so they won't need to repeat themselves. Then stop."}`
+> `transfer_to_human` `{"reason": "outside_policy", "caller_wants": "Caller wants an exception to return The Name of the Wind by Patrick Rothfuss, which is past the 30-day return wind…` → `{"status": "transferring", "instruction": "Tell the caller in one sentence that you're connecting them with a specialist who will have these details, so they won't need to repeat themselves. Then stop."}`
 
-**Bookly:** I can't make exceptions myself, so I'm connecting you with a specialist and passing along everything so you won't have to repeat yourself. _(3481 ms)_
+**Bookly:** I can't make exceptions myself, so I'm connecting you with a specialist who can review it, and I'm passing along everything so you won't have to repeat yourself. _(3756 ms)_
 
 ## Checks
 
@@ -42,8 +42,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "reason": "outside_policy",
-  "caller_wants": "To return The Name of the Wind by Patrick Rothfuss as an exception to the 30-day return window.",
-  "summary": "Caller ID matched Daniel Reyes. Order 416881, item 6, The Name of the Wind by Patrick Rothfuss, paperback, $19.99. It was delivered Wednesday, September 30th, and the return window ended Friday, October 30th (52 days since delivery), so it's not returnable. His reason: didn't like the book. He's asking for an exception. ZIP not verified yet. Still open: whether to allow the exception.",
+  "caller_wants": "Caller wants an exception to return The Name of the Wind by Patrick Rothfuss, which is past the 30-day return window.",
+  "summary": "Daniel Reyes, identified by caller ID; ZIP not verified. Order 416881, one item: The Name of the Wind by Patrick Rothfuss, paperback, $19.99, item_id 6. Delivered Wednesday, September 30th; return window ended Friday, October 30th (52 days since delivery). Reason for return: didn't like the book. Caller is asking for an exception to the return policy. Nothing has been promised. Still to decide: whether to allow the exception.",
   "customer": {
     "id": 3,
     "name": "Daniel Reyes",
@@ -64,7 +64,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-outside_window",
-  "duration_s": 34.2,
+  "duration_s": 33.2,
   "caller_id": "+12065550177",
   "customer": "Daniel Reyes",
   "identified_via": "caller_id",
@@ -74,8 +74,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "end_reason": "transfer:outside_policy",
   "handoff": {
     "reason": "outside_policy",
-    "caller_wants": "To return The Name of the Wind by Patrick Rothfuss as an exception to the 30-day return window.",
-    "summary": "Caller ID matched Daniel Reyes. Order 416881, item 6, The Name of the Wind by Patrick Rothfuss, paperback, $19.99. It was delivered Wednesday, September 30th, and the return window ended Friday, October 30th (52 days since delivery), so it's not returnable. His reason: didn't like the book. He's asking for an exception. ZIP not verified yet. Still open: whether to allow the exception.",
+    "caller_wants": "Caller wants an exception to return The Name of the Wind by Patrick Rothfuss, which is past the 30-day return window.",
+    "summary": "Daniel Reyes, identified by caller ID; ZIP not verified. Order 416881, one item: The Name of the Wind by Patrick Rothfuss, paperback, $19.99, item_id 6. Delivered Wednesday, September 30th; return window ended Friday, October 30th (52 days since delivery). Reason for return: didn't like the book. Caller is asking for an exception to the return policy. Nothing has been promised. Still to decide: whether to allow the exception.",
     "customer": {
       "id": 3,
       "name": "Daniel Reyes",
@@ -92,8 +92,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 2,
   "tool_calls": 2,
   "latency_ms": {
-    "p50": 2746,
-    "max": 3481
+    "p50": 2576,
+    "max": 3756
   }
 }
 ```
