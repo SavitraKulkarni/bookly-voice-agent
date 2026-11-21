@@ -3,7 +3,7 @@
 - **Persona:** `happy_path` · James Okafor · caller ID `+13125550142`
 - **Shows:** multi-turn, tool use (lookup_order, send_confirmation), caller-ID identification
 - **Result:** PASS (9/9 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1803 ms, max 3194 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1940 ms, max 3372 ms
 
 ## Transcript
 
@@ -13,21 +13,21 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hey, yeah, I ordered Project Hail Mary a few days ago and I'm just wondering when it's gonna arrive.
+**Caller:** Hi, yeah, I ordered Project Hail Mary a few days ago and was wondering when it's gonna arrive.
 
-**Bookly:** Your order with Project Hail Mary by Andy Weir shipped with USPS and is estimated to arrive Monday, November 23rd. Would you like me to text you the tracking number? _(1144 ms)_
+**Bookly:** Your order with Project Hail Mary by Andy Weir shipped with USPS and should arrive Monday, November 23rd. Would you like me to text you the tracking number? _(1791 ms)_
 
-**Caller:** Oh nice, yeah, please text me the tracking number.
+**Caller:** Oh great, Monday works. Yeah, please text me the tracking number.
 
 > `send_confirmation` `{"kind": "tracking", "channel": "sms", "order_number": "419120"}` → `{"status": "sent", "channel": "sms", "to": "***-***-0142", "mock": true, "note": "Delivery is mocked (written to the outbox)."}`
 
-**Bookly:** I sent the tracking number by text to your number ending in 0 1 4 2. Can I help with anything else? _(3194 ms)_
+**Bookly:** I've texted the tracking number to your phone number ending in 0 1 4 2. Is there anything else I can help with? _(3372 ms)_
 
-**Caller:** Great, got it. Thanks, that's all I needed.
+**Caller:** No, that's all. Thanks a lot, bye!
 
-> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, James, enjoy Project Hail Mary and have a great day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
+> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, James. Enjoy Project Hail Mary, and have a great weekend!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
 
-**Bookly:** You're welcome, James, enjoy Project Hail Mary and have a great day! _(1803 ms)_
+**Bookly:** You're welcome, James. Enjoy Project Hail Mary, and have a great weekend! _(1940 ms)_
 
 ## Checks
 
@@ -48,7 +48,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-happy_path",
-  "duration_s": 33.2,
+  "duration_s": 32.5,
   "caller_id": "+13125550142",
   "customer": "James Okafor",
   "identified_via": "caller_id",
@@ -60,8 +60,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 3,
   "tool_calls": 3,
   "latency_ms": {
-    "p50": 1803,
-    "max": 3194
+    "p50": 1940,
+    "max": 3372
   }
 }
 ```

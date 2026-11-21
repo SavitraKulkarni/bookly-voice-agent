@@ -3,7 +3,7 @@
 - **Persona:** `multi_book_clarify` · Maya Chen · caller ID `+14155550101`
 - **Shows:** clarifying question before answering (3 orders, one with 2 books), title + author confirmed back
 - **Result:** PASS (11/11 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1195 ms, max 1202 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1139 ms, max 1643 ms
 
 ## Transcript
 
@@ -15,17 +15,17 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 
 **Caller:** Hi, I'm calling to check on my order.
 
-**Bookly:** I see a few orders: one with The Overstory by Richard Powers, one with Klara and the Sun by Kazuo Ishiguro and another book, and an older one with Educated by Tara Westover. Which one are you asking about? _(1195 ms)_
+**Bookly:** I'd be happy to help, Maya. I see a few orders: one with The Overstory by Richard Powers, one with Klara and the Sun by Kazuo Ishiguro, and an older one with Educated by Tara Westover. Which one are you asking about? _(1139 ms)_
 
 **Caller:** The one with two books in it. I think one was Klara and the Sun.
 
-**Bookly:** Got it, order 4 1 8 0 2 7, with Klara and the Sun by Kazuo Ishiguro and Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin. It was delivered by UPS on Monday, November 9th. Is there anything else I can help with? _(1202 ms)_
+**Bookly:** Got it, the order with Klara and the Sun by Kazuo Ishiguro and Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin. That order was delivered by UPS on Monday, November 9th. Is there anything else I can help with? _(1643 ms)_
 
-**Caller:** Oh great, that's all I needed. Thanks, bye!
+**Caller:** Oh great, that's the one. Thanks so much, bye!
 
-> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, Maya. Enjoy your books, and have a great day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
+> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, Maya, enjoy your books and have a great day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
 
-**Bookly:** You're welcome, Maya. Enjoy your books, and have a great day! _(1193 ms)_
+**Bookly:** You're welcome, Maya, enjoy your books and have a great day! _(1082 ms)_
 
 ## Checks
 
@@ -48,7 +48,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-multi_book_clarify",
-  "duration_s": 33.2,
+  "duration_s": 32.5,
   "caller_id": "+14155550101",
   "customer": "Maya Chen",
   "identified_via": "caller_id",
@@ -60,8 +60,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 3,
   "tool_calls": 2,
   "latency_ms": {
-    "p50": 1195,
-    "max": 1202
+    "p50": 1139,
+    "max": 1643
   }
 }
 ```

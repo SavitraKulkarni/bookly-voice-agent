@@ -129,3 +129,20 @@ def test_faq_hits(q, topic):
 
 def test_faq_miss():
     assert faq_search("do you have a loyalty program for students") == []
+
+
+def test_end_call_rejects_junk_goodbye_and_pending_change(make_ctx):
+    ctx = make_ctx(MAYA)
+    r, err = call(ctx, "end_call", reason="resolved", goodbye="placeholder")
+    assert err and r["error"] == "bad_spoken_line" and not ctx.state.ended
+    call(ctx, "lookup_customer", method="caller_id")
+    call(ctx, "verify_zip", zip="94110")
+    call(ctx, "start_return", order_number="418027", item_id=1, reason="gift", resolution="refund")
+    r, err = call(ctx, "end_call", reason="resolved", goodbye="Thanks for calling Bookly, goodbye!")
+    assert err and r["error"] == "change_pending" and not ctx.state.ended
+
+
+def test_transfer_rejects_junk_line(make_ctx):
+    ctx = make_ctx(MAYA)
+    r, err = call(ctx, "transfer_to_human", reason="other", caller_wants="x", summary="y", say_to_caller="[line]")
+    assert err and r["error"] == "bad_spoken_line" and not ctx.state.ended

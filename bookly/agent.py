@@ -146,9 +146,9 @@ class Agent:
                        selected_order=self.state.selected_order)
         return result, is_error
 
-    def _create(self, on_text: Callable[[str], None] | None = None):
-        """One model call. With on_text, stream it and hand text deltas over as they arrive
-        (phone mode speaks them sentence by sentence); otherwise a plain request."""
+    def _create(self, stream_events: bool = False):
+        """One model call. Streamed in phone mode so a filler can start the moment a tool call
+        begins; the reply text itself is only spoken once the response is complete (see handle_turn)."""
         kwargs: dict[str, Any] = dict(
             model=self.model,
             max_tokens=16000,
@@ -163,7 +163,7 @@ class Agent:
                                                   "fallbacks": "default"}
         else:
             api = client().messages
-        if not on_text:
+        if not stream_events:
             return api.create(**kwargs), None
         t0 = time.monotonic()
         first_text_ms = None
@@ -171,12 +171,9 @@ class Agent:
             for event in stream:
                 if event.type == "content_block_start" and event.content_block.type == "tool_use":
                     self._tool_starting(event.content_block.name)  # before its arguments are written
-                elif event.type == "content_block_delta" and event.delta.type == "text_delta" and event.delta.text:
-                    if first_text_ms is None:
-                        first_text_ms = round((time.monotonic() - t0) * 1000)
-                    on_text(event.delta.text)
-                elif event.type == "content_block_stop" and first_text_ms is not None:
-                    on_text("\n")  # block boundary = sentence boundary for the speaker
+                elif (event.type == "content_block_delta" and event.delta.type == "text_delta"
+                      and event.delta.text and first_text_ms is None):
+                    first_text_ms = round((time.monotonic() - t0) * 1000)
             return stream.get_final_message(), first_text_ms
 
     # ------------------------------------------------------------------
@@ -204,7 +201,7 @@ class Agent:
         while True:
             t0 = time.monotonic()
             try:
-                resp, first_text_ms = self._create(on_text)
+                resp, first_text_ms = self._create(stream_events=on_text is not None)
             except anthropic.APIError as e:
                 self.log.event("model_error", error=type(e).__name__, message=str(e)[:500])
                 return self._fail_safe(t_turn, tools_used, f"model_error:{type(e).__name__}")
@@ -217,7 +214,15 @@ class Agent:
                            cache_read=getattr(u, "cache_read_input_tokens", None),
                            cache_write=getattr(u, "cache_creation_input_tokens", None))
             self.messages.append({"role": "assistant", "content": resp.content})
-            spoken += [b.text for b in resp.content if b.type == "text" and b.text.strip()]
+            texts = [b.text.strip() for b in resp.content if b.type == "text" and b.text.strip()]
+            if texts and resp.stop_reason == "tool_use":
+                # Text written next to a tool call comes before the tool's data: it is never a grounded
+                # answer, and can be the model's own notes. Log it, never say it.
+                self.log.event("unspoken_text", text=" ".join(texts))
+            elif texts:
+                spoken += texts
+                if on_text:
+                    on_text(" ".join(texts) + "\n")
 
             if resp.stop_reason == "refusal":
                 return self._fail_safe(t_turn, tools_used, "refusal")

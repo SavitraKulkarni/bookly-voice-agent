@@ -447,21 +447,28 @@ def main() -> None:
     ap.add_argument("--compare", nargs="+", metavar="NAME:k=v,...",
                     help='A/B configs, e.g. base: fast:prefetch=1,terminal_say=1 med:effort=medium')
     ap.add_argument("--repeats", type=int, default=1)
+    ap.add_argument("--suite", choices=["core", "edge"], default="core",
+                    help="core: the 6 requirement personas; edge: edge-case callers (bookly/edge_cases.py)")
     args = ap.parse_args()
     if args.compare:
         compare(args.compare, args.repeats, args.only)
         return
 
-    personas = [p for p in PERSONAS if not args.only or p.id == args.only]
-    run_dir = db.ROOT / "logs" / "sim" / time.strftime("%Y%m%d-%H%M%S")
+    if args.suite == "edge":
+        from bookly.edge_cases import EDGE_PERSONAS
+        pool, transcripts = EDGE_PERSONAS, TRANSCRIPTS / "edge"
+    else:
+        pool, transcripts = PERSONAS, TRANSCRIPTS
+    personas = [p for p in pool if not args.only or p.id == args.only]
+    run_dir = db.ROOT / "logs" / "sim" / (time.strftime("%Y%m%d-%H%M%S") + f"-{args.suite}")
     run_dir.mkdir(parents=True, exist_ok=True)
     print(f"Running {len(personas)} simulation(s) → logs in {run_dir.relative_to(db.ROOT)}")
 
-    with ThreadPoolExecutor(max_workers=len(personas)) as ex:
+    with ThreadPoolExecutor(max_workers=min(len(personas), 8)) as ex:
         results = list(ex.map(lambda p: run_persona(p, run_dir), personas))
 
-    TRANSCRIPTS.mkdir(parents=True, exist_ok=True)
-    out_dir = TRANSCRIPTS if not args.no_write else run_dir
+    transcripts.mkdir(parents=True, exist_ok=True)
+    out_dir = transcripts if not args.no_write else run_dir
     all_ok = True
     for r in results:
         path = write_transcript(r, out_dir)

@@ -493,6 +493,7 @@ def send_confirmation(ctx: ToolContext, kind: str, channel: str, order_number: s
 def transfer_to_human(ctx: ToolContext, reason: str, summary: str, caller_wants: str,
                       order_number: str | None = None, say_to_caller: str | None = None) -> dict[str, Any]:
     st = ctx.state
+    _check_spoken_line(say_to_caller, "say_to_caller")
     if order_number:
         try:
             st.selected_order = _load_order(ctx, order_number)["order_number"]
@@ -521,7 +522,25 @@ def transfer_to_human(ctx: ToolContext, reason: str, summary: str, caller_wants:
                            "who will have these details, so they won't need to repeat themselves. Then stop."}
 
 
+_JUNK_LINE = re.compile(r"placeholder|todo|tbd|lorem|[\[\]{}<>]", re.I)
+
+
+def _check_spoken_line(line: str | None, field: str) -> None:
+    """A closing line is spoken verbatim and ends the call, so it has to be a real sentence."""
+    if line is None:
+        return  # schema variant without a carried line
+    if len(line.split()) < 3 or _JUNK_LINE.search(line):
+        raise ToolError("bad_spoken_line", f"{field} must be the actual sentence to say to the caller.",
+                        f"Write the real one-sentence {field.replace('_', ' ')} and call again.")
+
+
 def end_call(ctx: ToolContext, reason: str, goodbye: str | None = None) -> dict[str, Any]:
+    pa = ctx.state.pending_action
+    if pa and ctx.state.caller_turns <= pa.proposed_at_turn:
+        raise ToolError("change_pending", "The caller hasn't answered the read-back yet.",
+                        "Don't end the call. Read the change back and wait for their yes or no.")
+    _check_spoken_line(goodbye, "goodbye")
+    ctx.state.pending_action = None  # caller answered and moved on: the unconfirmed change is abandoned
     ctx.state.ended = True
     ctx.state.end_reason = f"end:{reason}"
     ctx.state.closing_line = (goodbye or "").strip() or None
