@@ -1,0 +1,131 @@
+"""Guardrails are enforced in code, so they can be tested without the model."""
+import pytest
+
+from bookly import db
+from bookly.state import CallState
+from bookly.tools import ToolContext, faq_search, run_tool
+from data.seed import UNKNOWN_PHONE, seed
+
+MAYA = "+14155550101"
+
+
+@pytest.fixture
+def make_ctx(tmp_path):
+    path = tmp_path / "t.db"
+    seed(path)
+
+    def _make(caller_id=None):
+        return ToolContext(conn=db.connect(path), state=CallState(call_id="t", caller_id=caller_id))
+    return _make
+
+
+def call(ctx, name, **args):
+    return run_tool(ctx, name, args)
+
+
+def test_caller_id_lookup_hides_statuses(make_ctx):
+    ctx = make_ctx(MAYA)
+    r, err = call(ctx, "lookup_customer", method="caller_id")
+    assert not err and r["found"] and len(r["orders"]) == 3
+    assert all("status" not in o for o in r["orders"])
+
+
+def test_unknown_caller_identified_by_order_is_scoped(make_ctx):
+    ctx = make_ctx(UNKNOWN_PHONE)
+    r, _ = call(ctx, "lookup_customer", method="caller_id")
+    assert r["found"] is False
+    r, err = call(ctx, "lookup_order", order_number="420044")
+    assert not err and ctx.state.identified_via == "order_number"
+    # can't browse other orders (even other customers' orders look "not found")
+    _, err = call(ctx, "lookup_order", order_number="418027")
+    assert err
+
+
+def test_write_needs_zip_then_two_phase(make_ctx):
+    ctx = make_ctx(MAYA)
+    call(ctx, "lookup_customer", method="caller_id")
+    args = dict(order_number="418027", item_id=1, reason="duplicate gift", resolution="refund")
+    r, err = call(ctx, "start_return", **args)
+    assert err and r["error"] == "zip_required"
+    r, _ = call(ctx, "verify_zip", zip="94110")
+    assert r["verified"]
+    r, err = call(ctx, "start_return", **args)
+    assert not err and r["status"] == "needs_confirmation"
+    # confirming in the same caller turn is refused: the caller must answer first
+    r, err = call(ctx, "start_return", **args, confirmed=True)
+    assert err and r["error"] == "awaiting_caller"
+    ctx.state.caller_turns += 1
+    # confirming different details than were read back is refused
+    r, err = call(ctx, "start_return", **{**args, "resolution": "store_credit"}, confirmed=True)
+    assert err and r["error"] == "not_read_back"
+    r, err = call(ctx, "start_return", **args, confirmed=True)
+    assert not err and r["status"] == "return_started"
+    # idempotent
+    r, err = call(ctx, "start_return", **args, confirmed=True)
+    assert not err and r["status"] == "already_exists"
+    assert ctx.conn.execute("SELECT COUNT(*) FROM returns").fetchone()[0] == 1
+
+
+def test_outside_window_is_policy_error(make_ctx):
+    ctx = make_ctx("+12065550177")
+    call(ctx, "lookup_customer", method="caller_id")
+    call(ctx, "verify_zip", zip="98103")
+    r, err = call(ctx, "start_return", order_number="416881", item_id=6, reason="didn't like it",
+                  resolution="refund")
+    assert err and r["error"] == "outside_policy"
+
+
+def test_zip_locks_after_two_failures(make_ctx):
+    ctx = make_ctx(MAYA)
+    call(ctx, "lookup_customer", method="caller_id")
+    call(ctx, "verify_zip", zip="11111")
+    r, _ = call(ctx, "verify_zip", zip="22222")
+    assert r["attempts_left"] == 0
+    r, err = call(ctx, "verify_zip", zip="94110")
+    assert err and r["error"] == "verification_locked"
+
+
+def test_store_credit_idempotent(make_ctx):
+    ctx = make_ctx(MAYA)
+    call(ctx, "lookup_customer", method="caller_id")
+    call(ctx, "verify_zip", zip="94110")
+    args = dict(order_number="418027", item_id=2, reason="changed mind", resolution="store_credit")
+    call(ctx, "start_return", **args)
+    ctx.state.caller_turns += 1
+    r, _ = call(ctx, "start_return", **args, confirmed=True)
+    rid = r["return_id"]
+    r1, _ = call(ctx, "issue_store_credit", return_id=rid)
+    r2, _ = call(ctx, "issue_store_credit", return_id=rid)
+    assert r1["status"] == "credit_issued" and r2["status"] == "already_issued"
+    bal = ctx.conn.execute("SELECT store_credit_cents FROM customers WHERE id=1").fetchone()[0]
+    assert bal == 2799
+
+
+def test_cancel_only_processing(make_ctx):
+    ctx = make_ctx(MAYA)
+    call(ctx, "lookup_customer", method="caller_id")
+    call(ctx, "verify_zip", zip="94110")
+    r, err = call(ctx, "cancel_order", order_number="418355")
+    assert err and r["error"] == "not_cancellable"
+
+
+def test_sms_goes_only_to_caller_id(make_ctx):
+    ctx = make_ctx(MAYA)
+    call(ctx, "lookup_customer", method="caller_id")
+    call(ctx, "lookup_order", order_number="418355")
+    r, err = call(ctx, "send_confirmation", kind="tracking", channel="sms")
+    assert not err and r["to"].endswith("0101")
+
+
+@pytest.mark.parametrize("q,topic", [
+    ("how long does shipping take", "Shipping times and costs"),
+    ("do you ship to Canada", "International shipping"),
+    ("reset my password", "Password reset"),
+    ("what's the return policy", "Return policy"),
+])
+def test_faq_hits(q, topic):
+    assert faq_search(q)[0]["topic"] == topic
+
+
+def test_faq_miss():
+    assert faq_search("do you have a loyalty program for students") == []
