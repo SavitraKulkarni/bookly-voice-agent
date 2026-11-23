@@ -49,8 +49,9 @@ SCRIPTS = {
         ("Nine, four, one, one, zero.", None),
         ("No thanks, I'd rather have a refund.", None),
         ("Yes, go ahead.", None),
-        ("Text it to me, please.", None),
-        ("That's everything, thanks. Bye.", None),
+        ("No receipt, thanks. One more thing: can I also return Educated by Tara Westover? "
+         "I never got around to reading it.", None),
+        ("No thanks, that's fine. That's everything. Bye.", None),
     ]),
     "demo_sofia": ("+15125550199", [
         ("Hi, I'm checking on an order I placed for Lessons in Chemistry.", None),
