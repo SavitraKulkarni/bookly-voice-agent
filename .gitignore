@@ -9,3 +9,6 @@ __pycache__/
 data/*.db
 logs/
 .DS_Store
+
+# your own notes (talk track, rehearsal) — never committed
+private/
