@@ -138,7 +138,7 @@ Python with the Anthropic SDK and a hand-written tool loop. Twilio, AssemblyAI a
 
 ## What I'd do differently
 
-1. **First: turn real calls into tests.** My tests only cover problems I thought of. All 30 test callers came from my own head, and both real bugs (the "placeholder" goodbye and the stale yes) turned up where I wasn't looking. In production, real calls would become new tests every week, and no prompt or model change would ship until it passed them.
+1. **First: turn real calls into tests.** My tests only cover problems someone thought of in advance. All 30 test callers were written by hand (8 of them suggested by the independent review), and both real bugs (the "placeholder" goodbye and the stale yes) turned up where I wasn't looking. In production, real calls would become new tests every week, and no prompt or model change would ship until it passed them.
 2. **Sweep model and effort against that eval.** All results here are Opus 5.5 at effort `low`. The one model slip happened at `low`; `medium` measured no slower in the A/B. I'd pick by pass rate and latency together, per turn type.
 3. **Warm transfer into the helpdesk.** Today's handoff is a cold redirect with a spoken summary (built, not yet run on a live call). In production: a Twilio Conference so the agent can stay on until the person picks up, and the same handoff packet written into the Zendesk or Salesforce ticket.
 4. **Production plumbing:** registered SMS (A2P 10DLC), PII redaction in logs, rate limits and caller-level abuse limits, dashboards for time to first audio, handoff rate and containment.
