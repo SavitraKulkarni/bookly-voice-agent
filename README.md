@@ -15,7 +15,7 @@ Caller → Twilio media stream (8 kHz μ-law) → AssemblyAI streaming STT
 ## Run it (text mode)
 
 ```bash
-python3 -m venv .venv          # Python 3.10 or newer
+python3.13 -m venv .venv       # any Python 3.10+ (macOS's built-in python3 is 3.9: too old for the Anthropic SDK)
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env            # then fill in ANTHROPIC_API_KEY
 .venv/bin/python -m data.seed   # creates data/bookly.db
@@ -134,7 +134,7 @@ All six simulations are graded by code from the call log, state and database; th
 
 ## How I built this
 
-Python with the Anthropic SDK and a hand-written tool loop; no agent framework. Twilio, AssemblyAI and Cartesia are called directly over their WebSocket APIs. I wrote it with Claude Code as a pair: I set the thesis, architecture, call flow and guardrails up front (see [CLAUDE.md](CLAUDE.md)) and reviewed each tier before moving on. Claude wrote most of the code, the procedures and the simulations, and checked API details against each vendor's current docs. Quality was checked by code-graded simulations (6 personas, re-run after every behavior change) and guardrail tests that run without the model. Latency was improved by measuring first (A/B in one run, configs interleaved), not guessing.
+Python with the Anthropic SDK and a hand-written tool loop. Twilio, AssemblyAI and Cartesia are called directly over their WebSocket APIs. I wrote it with Claude Code as a pair: I set the thesis, architecture, call flow and guardrails up front (see [CLAUDE.md](CLAUDE.md)) and reviewed each tier before moving on. Claude wrote most of the code, the procedures and the simulations, and checked API details against each vendor's current docs. Quality was checked by code-graded simulations (6 personas, re-run after every behavior change) and automated guardrail tests. Latency was improved by measuring first (A/B in one run, configs interleaved).
 
 ## What I'd do differently
 
@@ -207,3 +207,8 @@ Each entry: what I chose, what it costs, and why it was worth it.
 - **Choice:** Speak only the text of the response that ends the turn (plus a closing line carried by `end_call` / `transfer_to_human`, which is checked to be a real sentence). Text written alongside a tool call comes before the tool's data, so it's never a grounded answer anyway; it's logged, not said.
 - **Trade-off:** No streaming of the spoken reply itself (which measured no gain here, decision 7). Fillers still start the moment a tool call begins.
 - **Why:** The caller should only ever hear what the agent stands behind. A guard in code holds even on the rare turn the model slips.
+
+### 9. Scope: keyword FAQ search and mocked notifications
+- **Choice:** `search_faq` uses keyword and section matching over one short FAQ page ([data/faq.md](data/faq.md)). Texts, emails and password resets are mocked: each is written to the `outbox` table and the tool log. Twilio, AssemblyAI, Cartesia and Claude are orchestrated directly in Python.
+- **Trade-off:** A large help center would need semantic search. Mocked notifications are logged rather than delivered to the caller.
+- **Why:** For a one-page FAQ, keyword search returns the exact entry instantly and predictably, and a clean "not found" is the signal to offer a person. Live texts go out once A2P 10DLC carrier registration is approved. Depth over breadth: the time went into guardrails and latency.
