@@ -13,6 +13,7 @@ from typing import Any
 # How sure we are of who's calling. Writes need "zip_verified".
 VERIFICATION_LEVELS = ("none", "identified", "zip_verified")
 MAX_ZIP_FAILURES = 2
+MAX_ID_FAILURES = 3   # wrong order numbers / emails before identification locks
 
 
 @dataclass
@@ -34,6 +35,7 @@ class CallState:
     identified_via: str | None = None        # caller_id | order_number | email
     scoped_order: str | None = None          # identified by order number -> only this order
     zip_failures: int = 0
+    id_failures: int = 0
 
     selected_order: str | None = None
     pending_action: PendingAction | None = None
@@ -58,6 +60,19 @@ class CallState:
     @property
     def zip_locked(self) -> bool:
         return self.zip_failures >= MAX_ZIP_FAILURES
+
+    @property
+    def id_locked(self) -> bool:
+        return self.id_failures >= MAX_ID_FAILURES
+
+    def forget_identity(self) -> None:
+        """Caller corrected an order number before verifying anything: start identification over."""
+        self.verified_customer = None
+        self.verification_level = "none"
+        self.identified_via = None
+        self.scoped_order = None
+        self.selected_order = None
+        self.pending_action = None
 
     def identify(self, customer: dict[str, Any], via: str, scoped_order: str | None = None) -> None:
         self.verified_customer = customer

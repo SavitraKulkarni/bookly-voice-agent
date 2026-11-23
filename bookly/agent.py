@@ -81,7 +81,7 @@ class Agent:
         self.conn = conn or db.connect()
         self.log = logger or CallLogger(self.call_id)
         self.model = model or os.environ.get("BOOKLY_MODEL", "claude-opus-5-5")
-        self.effort = effort or os.environ.get("BOOKLY_EFFORT", "high")
+        self.effort = effort or os.environ.get("BOOKLY_EFFORT", "low")
         self.fallback = os.environ.get("BOOKLY_REFUSAL_FALLBACK", "0") == "1"
         # Latency levers (see README decisions log). Flags so they can be A/B'd in one simulation run.
         self.prefetch = prefetch if prefetch is not None else os.environ.get("BOOKLY_PREFETCH", "1") == "1"

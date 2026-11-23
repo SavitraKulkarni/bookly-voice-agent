@@ -3,21 +3,21 @@
 - **Persona:** `damaged_book` · Maya Chen · caller ID `+14155550101`
 - **Shows:** damaged items are escalated, not handled as a normal return
 - **Result:** PASS (6/6 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 4422 ms, max 4422 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 3585 ms, max 3585 ms
 
 ## Transcript
 
 Tool calls appear in the order they ran. `[system]` calls are made by code, not the model.
 
-> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "Maya Chen", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "418355", "placed_at": "Tuesday, November 17th", "items": [{"title": "The Overstory", "author":…`
+> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "Maya Chen", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "418355", "placed_at": "Wednesday, November 18th", "items": [{"title": "The Overstory", "author…`
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hi, yeah, my copy of Tomorrow, and Tomorrow, and Tomorrow just showed up and the cover's torn and it looks like it got wet. I'd like to get that sorted out.
+**Caller:** Hi, yeah, I got my copy of Tomorrow, and Tomorrow, and Tomorrow and the cover's torn and it looks like it got wet. I'd like to get that fixed.
 
-> `transfer_to_human` `{"reason": "lost_or_damaged", "caller_wants": "Resolution for a damaged copy of Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin (torn cover, water damag…` → `{"status": "transferring", "instruction": "Tell the caller in one sentence that you're connecting them with a specialist who will have these details, so they won't need to repeat themselves. Then stop."}`
+> `transfer_to_human` `{"reason": "lost_or_damaged", "caller_wants": "Caller received a damaged copy (torn cover, water damage) of Tomorrow, and Tomorrow, and Tomorrow and wants it re…` → `{"status": "transferring", "instruction": "Tell the caller in one sentence that you're connecting them with a specialist who will have these details, so they won't need to repeat themselves. Then stop."}`
 
-**Bookly:** I'm sorry it arrived damaged. I'm connecting you with a specialist and passing along everything, so you won't have to repeat yourself. _(4422 ms)_
+**Bookly:** I'm sorry it arrived damaged. I'm connecting you with a specialist and passing along everything, so you won't have to repeat yourself. _(3585 ms)_
 
 ## Checks
 
@@ -26,7 +26,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 | greeting verbatim | ✅ |
 | call ended cleanly (end_call or transfer) | ✅ |
 | no malformed tool calls | ✅ |
-| voice style: replies <= 60 words, no markdown/URLs | ✅ |
+| voice style: replies <= 60 words (book titles/authors not counted), no markdown/URLs | ✅ |
 | transferred: lost_or_damaged | ✅ |
 | no return created | ✅ |
 
@@ -35,8 +35,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "reason": "lost_or_damaged",
-  "caller_wants": "Resolution for a damaged copy of Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin (torn cover, water damage).",
-  "summary": "Caller Maya Chen, identified by caller ID, ZIP not verified. Reports Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin (hardcover, $27.99, item 2) arrived with a torn cover and apparent water damage. Most likely order 418027: system shows delivered Monday, November 9th via UPS, return window open until December 9th. Caller said it 'just showed up', so please confirm the order and delivery date with her. Unresolved: replacement or refund for the damaged book.",
+  "caller_wants": "Caller received a damaged copy (torn cover, water damage) of Tomorrow, and Tomorrow, and Tomorrow and wants it resolved.",
+  "summary": "Caller ID matched Maya Chen. Book is Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin, hardcover, $27.99, item 2 on order 418027, delivered Tuesday, November 10th, return window open until December 10th. Caller reports torn cover and water damage. ZIP not verified. Replacement or refund not yet decided.",
   "customer": {
     "id": 1,
     "name": "Maya Chen",
@@ -57,7 +57,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-damaged_book",
-  "duration_s": 15.7,
+  "duration_s": 48.6,
   "caller_id": "+14155550101",
   "customer": "Maya Chen",
   "identified_via": "caller_id",
@@ -67,8 +67,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "end_reason": "transfer:lost_or_damaged",
   "handoff": {
     "reason": "lost_or_damaged",
-    "caller_wants": "Resolution for a damaged copy of Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin (torn cover, water damage).",
-    "summary": "Caller Maya Chen, identified by caller ID, ZIP not verified. Reports Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin (hardcover, $27.99, item 2) arrived with a torn cover and apparent water damage. Most likely order 418027: system shows delivered Monday, November 9th via UPS, return window open until December 9th. Caller said it 'just showed up', so please confirm the order and delivery date with her. Unresolved: replacement or refund for the damaged book.",
+    "caller_wants": "Caller received a damaged copy (torn cover, water damage) of Tomorrow, and Tomorrow, and Tomorrow and wants it resolved.",
+    "summary": "Caller ID matched Maya Chen. Book is Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin, hardcover, $27.99, item 2 on order 418027, delivered Tuesday, November 10th, return window open until December 10th. Caller reports torn cover and water damage. ZIP not verified. Replacement or refund not yet decided.",
     "customer": {
       "id": 1,
       "name": "Maya Chen",
@@ -85,8 +85,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 1,
   "tool_calls": 2,
   "latency_ms": {
-    "p50": 4422,
-    "max": 4422
+    "p50": 3585,
+    "max": 3585
   }
 }
 ```

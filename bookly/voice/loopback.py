@@ -23,6 +23,7 @@ import time
 from websockets.asyncio.client import connect
 
 import bookly.agent  # noqa: F401  (loads .env)
+from bookly.voice.call import stream_token
 from bookly.voice.tts import TTS
 
 FRAME = 160          # 20 ms of 8 kHz mu-law, what Twilio sends
@@ -161,13 +162,14 @@ async def run_call(url: str, phone: str, lines: list[tuple[str, float | None]], 
     log = (lambda *a: None) if quiet else print
     async with connect(url, max_size=None) as ws:
         tw = FakeTwilio(ws)
-        params = {"caller": phone}
+        call_sid = f"CAloop{time.time_ns()}"
+        # Sign like /voice does (needs TWILIO_AUTH_TOKEN from .env): the server rejects unsigned streams.
+        params = {"caller": phone, "token": stream_token(call_sid, phone)}
         if streaming is not None:
             params["streaming"] = streaming
         await tw.send({"event": "connected", "protocol": "Call", "version": "1.0.0"})
         await tw.send({"event": "start", "streamSid": "MZloop",
-                       "start": {"streamSid": "MZloop", "callSid": f"CAloop{time.time_ns()}",
-                                 "customParameters": params}})
+                       "start": {"streamSid": "MZloop", "callSid": call_sid, "customParameters": params}})
         up, down = asyncio.create_task(tw.uplink()), asyncio.create_task(tw.downlink())
         tw.waiting_since = time.monotonic()
         await tw.agent_idle()

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from bookly.db import ROOT
-from bookly.state import CallState, PendingAction
+from bookly.state import MAX_ID_FAILURES, CallState, PendingAction
 
 RETURN_WINDOW_DAYS = 30
 FAQ_PATH = ROOT / "data" / "faq.md"
@@ -231,6 +231,14 @@ def _two_phase(ctx: ToolContext, action: str, key: str, read_back: str, confirme
             "The caller hasn't answered the read-back yet.",
             "Say the read-back and wait for the caller's reply before confirming.",
         )
+    if st.caller_turns > pa.proposed_at_turn + 1:
+        # The yes must answer the read-back itself. A later "yes" (to "anything else?") doesn't count.
+        st.pending_action = None
+        raise ToolError(
+            "read_back_expired",
+            "The read-back was a while ago, so the caller's yes may be about something else.",
+            "If they still want the change, call the tool without confirmed to read it back again.",
+        )
     result = execute()
     st.pending_action = None
     return result
@@ -239,6 +247,23 @@ def _two_phase(ctx: ToolContext, action: str, key: str, read_back: str, confirme
 # --------------------------------------------------------------------------
 # Tool handlers
 # --------------------------------------------------------------------------
+def _can_reidentify(st: CallState) -> bool:
+    """Identified only by an order number, nothing verified or changed yet: a correction is allowed."""
+    return st.identified_via == "order_number" and not st.zip_verified and not st.actions_taken
+
+
+def _require_id_attempts(st: CallState) -> None:
+    if st.id_locked:
+        raise ToolError("identification_locked",
+                        "Too many order numbers or emails didn't match, so I can't look up accounts on this call.",
+                        "Apologise and offer a transfer (reason verification_failed).")
+
+
+def _id_miss(st: CallState) -> int:
+    st.id_failures += 1
+    return max(0, MAX_ID_FAILURES - st.id_failures)
+
+
 def lookup_customer(ctx: ToolContext, method: str, email: str | None = None) -> dict[str, Any]:
     st = ctx.state
     if method == "caller_id":
@@ -252,13 +277,18 @@ def lookup_customer(ctx: ToolContext, method: str, email: str | None = None) -> 
     elif method == "email":
         if not email:
             raise ToolError("missing_email", "No email given.", "Ask the caller for the email on their account.")
+        _require_id_attempts(st)
         cust = _customer_row(ctx.conn, email=email.strip().lower())
         if not cust:
-            return {"found": False, "message": "No account with that email.",
-                    "guidance": "Spell the email back to check it. If it still doesn't match, offer a transfer."}
+            left = _id_miss(st)
+            return {"found": False, "message": "No account with that email.", "attempts_left": left,
+                    "guidance": ("Spell the email back to check it." if left else
+                                 "No attempts left: offer a transfer (verification_failed).")}
     else:
         raise ToolError("bad_method", f"Unknown method {method!r}.", "Use caller_id or email.")
 
+    if st.verified_customer and st.verified_customer["id"] != cust["id"] and _can_reidentify(st):
+        st.forget_identity()
     if st.verified_customer and st.verified_customer["id"] != cust["id"]:
         raise ToolError("already_identified", "This call is already linked to a different account.",
                         "Don't switch accounts mid-call. Offer a transfer if needed.")
@@ -276,11 +306,26 @@ def lookup_customer(ctx: ToolContext, method: str, email: str | None = None) -> 
 
 def lookup_order(ctx: ToolContext, order_number: str) -> dict[str, Any]:
     st = ctx.state
-    row = _load_order(ctx, order_number)
+    num = _digits(order_number)
+    if _can_reidentify(st) and num != st.scoped_order:
+        st.forget_identity()  # caller corrected their order number before verifying anything
     if not st.identified:
+        _require_id_attempts(st)
+        try:
+            row = _load_order(ctx, order_number)
+        except ToolError as e:
+            left = _id_miss(st)
+            e.guidance += f" Attempts left: {left}." if left else " No attempts left: offer a transfer (verification_failed)."
+            raise
         cust = _customer_row(ctx.conn, id=row["customer_id"])
         st.identify(cust, via="order_number", scoped_order=row["order_number"])
+    else:
+        row = _load_order(ctx, order_number)
     st.selected_order = row["order_number"]
+    if st.identified_via == "order_number":
+        # An order number proves possession of one order, not who the account holder is.
+        return {"order": _order_view(ctx, row),
+                "note": "Identified by order number only: don't say the account holder's name or other orders."}
     return {"customer_name": st.verified_customer["name"], "order": _order_view(ctx, row)}
 
 
@@ -292,12 +337,9 @@ def verify_zip(ctx: ToolContext, zip: str) -> dict[str, Any]:
     if st.zip_locked:
         _require_zip(st)
     z = _digits(zip)[:5]
-    valid = {cust["zip"]}
-    if st.selected_order:
-        r = ctx.conn.execute("SELECT ship_zip FROM orders WHERE order_number = ?", (st.selected_order,)).fetchone()
-        if r:
-            valid.add(r["ship_zip"])
-    if len(z) == 5 and z in valid:
+    # Account (billing) ZIP only. The shipping ZIP is printed on the package next to the order number,
+    # so whoever holds the box would know both.
+    if len(z) == 5 and z == cust["zip"]:
         st.verification_level = "zip_verified"
         return {"verified": True}
     st.zip_failures += 1
@@ -379,24 +421,32 @@ def start_return(ctx: ToolContext, order_number: str, item_id: int, reason: str,
     read_back = f"Return {book} from order {order['order_number']}, {outcome}."
 
     def execute():
-        status = "awaiting_book"
+        cust = st.verified_customer
+        credit = resolution == "store_credit"
         cur = ctx.conn.execute(
-            "INSERT INTO returns (order_number,item_id,reason,resolution,amount_cents,status,created_at)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (order["order_number"], item_id, reason.strip(), resolution, amount, status, _now()),
+            "INSERT INTO returns (order_number,item_id,reason,resolution,amount_cents,status,credit_issued,created_at)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (order["order_number"], item_id, reason.strip(), resolution, amount,
+             "credit_issued" if credit else "awaiting_book", int(credit), _now()),
         )
-        ctx.conn.commit()
         rid = cur.lastrowid
+        if credit:  # same transaction as the return: the credit promised "right away" can't be lost
+            ctx.conn.execute("UPDATE customers SET store_credit_cents = store_credit_cents + ? WHERE id = ?",
+                             (amount, cust["id"]))
+        ctx.conn.commit()
+        _outbox(ctx, "email", cust["email"], "return_label",
+                f"Bookly prepaid return label for {book} (return #{rid}, order {order['order_number']})",
+                dedupe=f"label:{rid}")
         st.actions_taken.append(f"return #{rid}: {book} ({resolution}, {_money(amount)})")
-        res = {"status": "return_started", "return_id": rid, "resolution": resolution,
-               "amount": _money(amount),
-               "next_steps": "A prepaid return label is emailed to the address on file. "
-                             + ("Refund issues 5 to 7 business days after we receive the book."
-                                if resolution == "refund" else
-                                "Call issue_store_credit with this return_id to add the credit now.")}
-        return res
+        return {"status": "return_started", "return_id": rid, "resolution": resolution,
+                "amount": _money(amount),
+                "next_steps": "A prepaid return label has been emailed to the address on file. "
+                              + ("Refund issues 5 to 7 business days after we receive the book."
+                                 if resolution == "refund" else
+                                 f"{_money(amount)} in store credit is on the account now.")}
 
-    key = f"return:{order['order_number']}:{item_id}:{resolution}"
+    # The reason is part of what's confirmed: a different reason means a different change.
+    key = f"return:{order['order_number']}:{item_id}:{resolution}:{reason.strip().lower()}"
     return _two_phase(ctx, "start_return", key, read_back, confirmed, execute)
 
 
@@ -431,7 +481,9 @@ def search_faq(ctx: ToolContext, query: str) -> dict[str, Any]:
                 "guidance": "The FAQ doesn't cover this. Say you don't have that answer and offer a transfer. "
                             "Don't answer from general knowledge."}
     return {"found": True, "results": hits,
-            "guidance": "Answer only from these results, in one or two spoken sentences."}
+            "guidance": "These are the closest FAQ entries, not necessarily answers. If one directly answers the "
+                        "caller's exact question, answer from it in one or two spoken sentences. If none does, "
+                        "say you don't have that answer and offer a transfer. Never stretch a nearby entry."}
 
 
 def send_password_reset(ctx: ToolContext, confirmed: bool = False) -> dict[str, Any]:
@@ -467,6 +519,11 @@ def send_confirmation(ctx: ToolContext, kind: str, channel: str, order_number: s
 
     if order_number:
         st.selected_order = _load_order(ctx, order_number)["order_number"]
+    if kind == "tracking" and not st.selected_order:
+        tracked = ctx.conn.execute("SELECT order_number FROM orders WHERE customer_id = ? AND tracking_number IS NOT NULL"
+                                   " AND status IN ('shipped','delivered')", (cust["id"],)).fetchall()
+        if len(tracked) == 1:
+            st.selected_order = tracked[0]["order_number"]
     if kind == "tracking":
         if not st.selected_order:
             raise ToolError("no_order", "No order selected.", "Confirm which order first.")
@@ -522,14 +579,14 @@ def transfer_to_human(ctx: ToolContext, reason: str, summary: str, caller_wants:
                            "who will have these details, so they won't need to repeat themselves. Then stop."}
 
 
-_JUNK_LINE = re.compile(r"placeholder|todo|tbd|lorem|[\[\]{}<>]", re.I)
+_JUNK_LINE = re.compile(r"\b(placeholder|todo|tbd|lorem)\b|[\[\]{}<>]", re.I)
 
 
 def _check_spoken_line(line: str | None, field: str) -> None:
     """A closing line is spoken verbatim and ends the call, so it has to be a real sentence."""
     if line is None:
         return  # schema variant without a carried line
-    if len(line.split()) < 3 or _JUNK_LINE.search(line):
+    if len(line.split()) < 2 or _JUNK_LINE.search(line):
         raise ToolError("bad_spoken_line", f"{field} must be the actual sentence to say to the caller.",
                         f"Write the real one-sentence {field.replace('_', ' ')} and call again.")
 
@@ -632,7 +689,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "verify_zip",
-        "description": "Verify the ZIP code on file. Required before any change. Two failures lock changes.",
+        "description": "Verify the ZIP code on the account. Required before any change. Two failures lock changes.",
         "input_schema": _schema({"zip": {"type": "string"}}, ["zip"]),
     },
     {
@@ -644,8 +701,9 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "start_return",
         "description": "Start a return for one book within the 30-day window, as a refund (after the book is "
-                       "received) or store credit (immediate). Two-phase like cancel_order. Needs ZIP verification. "
-                       "Idempotent per book.",
+                       "received) or store credit (added to the account the moment it's confirmed). Two-phase like "
+                       "cancel_order: confirm with exactly the same arguments, on the caller's next turn. Needs ZIP "
+                       "verification. Idempotent per book.",
         "input_schema": _schema({
             "order_number": {"type": "string"},
             "item_id": {"type": "integer", "description": "item_id from lookup_order."},
@@ -656,7 +714,8 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "issue_store_credit",
-        "description": "Add store credit for a confirmed store-credit return. Idempotent per return.",
+        "description": "Check or re-apply the credit for an existing store-credit return. start_return already adds "
+                       "the credit when it's confirmed, so this is rarely needed. Idempotent per return.",
         "input_schema": _schema({"return_id": {"type": "integer"}}, ["return_id"]),
     },
     {

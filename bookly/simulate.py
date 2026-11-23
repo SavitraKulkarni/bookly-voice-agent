@@ -256,6 +256,18 @@ PERSONAS: list[Persona] = [
     ),
 ]
 
+from data.seed import ITEMS as _CATALOG
+
+# Titles and authors must be read back (spec), so they don't count against the length limit.
+_BOOK_NAMES = sorted({x for _, title, author, _, _ in _CATALOG for x in (title, author)}, key=len, reverse=True)
+
+
+def _spoken_words(text: str) -> int:
+    for name in _BOOK_NAMES:
+        text = text.replace(name, " ")
+    return len(text.split())
+
+
 MARKDOWN = re.compile(r"(\*\*|^#|^\s*[-*•]\s|\[.*\]\(|https?://)", re.M)
 
 GLOBAL_CHECKS: list[tuple[str, Callable[[SimResult], bool]]] = [
@@ -264,8 +276,8 @@ GLOBAL_CHECKS: list[tuple[str, Callable[[SimResult], bool]]] = [
     ("call ended cleanly (end_call or transfer)", lambda r: r.agent.state.ended),
     ("no malformed tool calls", lambda r: not any(c["result"].get("error") in ("bad_arguments", "unknown_tool")
                                                   for c in r.log.tool_calls())),
-    ("voice style: replies <= 60 words, no markdown/URLs", lambda r: all(
-        len(t.split()) <= 60 and not MARKDOWN.search(t) for t in r.agent_texts())),
+    ("voice style: replies <= 60 words (book titles/authors not counted), no markdown/URLs", lambda r: all(
+        _spoken_words(t) <= 60 and not MARKDOWN.search(t) for t in r.agent_texts())),
 ]
 
 

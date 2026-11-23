@@ -22,6 +22,9 @@ import uuid
 from typing import Any
 from xml.sax.saxutils import escape, quoteattr
 
+import hashlib
+import hmac
+
 from bookly import db
 from bookly.agent import GREETING, Agent
 from bookly.voice.stt import STTStream
@@ -94,6 +97,14 @@ async def load_phrases() -> None:
                 print(f"[server] could not pre-synthesize {key!r}: {e}")
     finally:
         await tts.close()
+
+
+def stream_token(call_sid: str, caller: str) -> str:
+    """Binds a media stream to the call /voice answered. /voice only answers Twilio-signed requests, so
+    only Twilio (or someone holding the auth token, e.g. the local loopback tester) can open /media
+    with a given caller ID."""
+    key = os.environ.get("TWILIO_AUTH_TOKEN", "").encode()
+    return hmac.new(key, f"{call_sid}|{caller}".encode(), hashlib.sha256).hexdigest()
 
 
 def e164(number: str) -> str:
@@ -294,10 +305,16 @@ class CallSession:
         self.marks.clear()
         self.playback_idle.set()
         heard = " ".join(self.heard).strip()
-        self.agent.state.interruption_note = (
+        st = self.agent.state
+        readback_cut = bool(cut) and st.pending_action is not None and st.pending_action.proposed_at_turn == st.caller_turns
+        if readback_cut:
+            st.pending_action = None  # they never heard the whole read-back, so nothing they say next confirms it
+        st.interruption_note = (
             "The caller interrupted your last reply. "
             + (f'They heard: "{heard}". ' if heard else "They heard almost none of it. ")
             + (f'They did not hear: "{" ".join(cut)}". ' if cut else "")
+            + ("Your read-back was cut off, so the change is NOT confirmed: read it back again if they still want it. "
+               if readback_cut else "")
             + "Respond to what they just said; repeat anything important they missed only if it's still relevant."
         )
         self.log.event("barge_in", partial=transcript, heard=heard, cut=cut)

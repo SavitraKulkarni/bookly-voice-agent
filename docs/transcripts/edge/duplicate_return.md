@@ -3,47 +3,51 @@
 - **Persona:** `duplicate_return` · Maya Chen · caller ID `+14155550101`
 - **Shows:** idempotent writes: one return per book, whatever the caller says
 - **Result:** PASS (6/6 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1822 ms, max 6580 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 2365 ms, max 3285 ms
 
 ## Transcript
 
 Tool calls appear in the order they ran. `[system]` calls are made by code, not the model.
 
-> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "Maya Chen", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "418355", "placed_at": "Tuesday, November 17th", "items": [{"title": "The Overstory", "author":…`
+> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "Maya Chen", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "418355", "placed_at": "Wednesday, November 18th", "items": [{"title": "The Overstory", "author…`
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hi, I'd like to return a book I got, Klara and the Sun. It was a duplicate gift, so I'm hoping to get a refund.
+**Caller:** Hi, I'd like to return a book I got. It's Klara and the Sun, I ended up with two copies as gifts.
 
-**Bookly:** Got it, Klara and the Sun by Kazuo Ishiguro from order 4 1 8 0 2 7, and it's within the return window. To make changes, I need to verify the ZIP code on the account. What's your ZIP? _(1177 ms)_
+**Bookly:** Got it, Klara and the Sun by Kazuo Ishiguro from order 4 1 8 0 2 7, and that's eligible for return. To make changes, I need to verify the ZIP code on the account. What's your ZIP? _(2365 ms)_
 
-**Caller:** It's 94110.
+**Caller:** Sure, it's 94110.
 
 > `verify_zip` `{"zip": "94110"}` → `{"verified": true}`
 
-> `start_return` `{"order_number": "418027", "item_id": 1, "reason": "duplicate gift", "resolution": "refund"}` → `{"status": "needs_confirmation", "read_back": "Return Klara and the Sun by Kazuo Ishiguro from order 418027, refunded $14.99 to the original payment method once we receive the book.", "instruction": "Read this back to th…`
+**Bookly:** Thanks, you're verified. I can add store credit of fourteen ninety-nine to your account right away, or refund it to your original payment once we receive the book. Would store credit work? _(2855 ms)_
 
-**Bookly:** Thanks, your ZIP is verified. Just to confirm: you're returning Klara and the Sun by Kazuo Ishiguro from order 4 1 8 0 2 7, and fourteen ninety-nine goes back to your original payment once we receive the book. Shall I go ahead? _(6580 ms)_
+**Caller:** I'd rather just get the refund to my original payment, please.
+
+> `start_return` `{"order_number": "418027", "item_id": 1, "reason": "Received duplicate copy as gift", "resolution": "refund"}` → `{"status": "needs_confirmation", "read_back": "Return Klara and the Sun by Kazuo Ishiguro from order 418027, refunded $14.99 to the original payment method once we receive the book.", "instruction": "Read this back to th…`
+
+**Bookly:** Just to confirm: a return of Klara and the Sun by Kazuo Ishiguro from order 4 1 8 0 2 7, with fourteen ninety-nine refunded to your original payment once we receive the book. Shall I go ahead? _(2956 ms)_
 
 **Caller:** Yes, go ahead.
 
-> `start_return` `{"order_number": "418027", "item_id": 1, "reason": "duplicate gift", "resolution": "refund", "confirmed": true}` → `{"status": "return_started", "return_id": 1, "resolution": "refund", "amount": "$14.99", "next_steps": "A prepaid return label is emailed to the address on file. Refund issues 5 to 7 business days after we receive the bo…`
+> `start_return` `{"order_number": "418027", "item_id": 1, "reason": "Received duplicate copy as gift", "resolution": "refund", "confirmed": true}` → `{"status": "return_started", "return_id": 1, "resolution": "refund", "amount": "$14.99", "next_steps": "A prepaid return label has been emailed to the address on file. Refund issues 5 to 7 business days after we receive …`
 
-**Bookly:** Your return is started. We'll email a prepaid return label to the address on file, and your refund goes through 5 to 7 business days after we receive the book. Would you like a receipt by text or email? _(3190 ms)_
+**Bookly:** Your return has started. I've emailed a prepaid return label to the address on file, and the refund goes through 5 to 7 business days after we get the book. Would you like a receipt by text or email? _(3285 ms)_
 
-**Caller:** No thanks, I don't need a receipt.
+**Caller:** No, I don't need a receipt, thanks.
 
-**Bookly:** No problem. Is there anything else I can help you with today? _(1854 ms)_
+**Bookly:** No problem. Is there anything else I can help you with? _(1348 ms)_
 
 **Caller:** Wait, I'm not sure that went through. Can you do it again to be safe?
 
-**Bookly:** Don't worry, it went through. Our system shows the return for Klara and the Sun by Kazuo Ishiguro is in place, and we're waiting for the book to arrive, so you don't need to do it again. Is there anything else I can help with? _(1790 ms)_
+**Bookly:** Good news: it went through, so you don't need to do anything else. Our system shows the return for Klara and the Sun by Kazuo Ishiguro is set up, and it's waiting for the book to arrive. Is there anything else I can help with? _(1944 ms)_
 
-**Caller:** Oh good, thanks for checking. That's all I needed, bye!
+**Caller:** Oh good, that's a relief. No, that's all, thanks. Bye!
 
-> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, Maya, thanks for calling Bookly and have a great day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
+> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, thanks for calling Bookly, and enjoy the rest of your day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
 
-**Bookly:** You're welcome, Maya, thanks for calling Bookly and have a great day! _(1771 ms)_
+**Bookly:** You're welcome, thanks for calling Bookly, and enjoy the rest of your day! _(1779 ms)_
 
 ## Checks
 
@@ -52,7 +56,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 | greeting verbatim | ✅ |
 | call ended cleanly (end_call or transfer) | ✅ |
 | no malformed tool calls | ✅ |
-| voice style: replies <= 60 words, no markdown/URLs | ✅ |
+| voice style: replies <= 60 words (book titles/authors not counted), no markdown/URLs | ✅ |
 | exactly one return row | ✅ |
 | told it's already done | ✅ |
 
@@ -61,7 +65,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-duplicate_return",
-  "duration_s": 26.1,
+  "duration_s": 58.2,
   "caller_id": "+14155550101",
   "customer": "Maya Chen",
   "identified_via": "caller_id",
@@ -72,11 +76,11 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   ],
   "end_reason": "end:resolved",
   "handoff": null,
-  "caller_turns": 6,
+  "caller_turns": 7,
   "tool_calls": 5,
   "latency_ms": {
-    "p50": 1822,
-    "max": 6580
+    "p50": 2365,
+    "max": 3285
   }
 }
 ```

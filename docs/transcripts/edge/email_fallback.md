@@ -3,7 +3,7 @@
 - **Persona:** `email_fallback` · Maya Chen (calling from a work phone) · caller ID `+15125550199`
 - **Shows:** identity ladder: caller ID, then order number, then email
 - **Result:** PASS (8/8 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1578 ms, max 4270 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1662 ms, max 4507 ms
 
 ## Transcript
 
@@ -13,29 +13,29 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hi, I'm trying to find out where my order of The Overstory is. Can you check on that for me?
+**Caller:** Hi, yeah, I'm trying to find out where my order of The Overstory is. It hasn't shown up yet.
 
-**Bookly:** Sure, I can check on that. What's the order number? _(936 ms)_
+**Bookly:** I can check that for you. What's your order number? _(1541 ms)_
 
-**Caller:** Oh, I don't have it handy right now, sorry. I'm calling from my work phone.
+**Caller:** Oh, I don't have it handy right now, sorry. I'm calling from work.
 
 > `lookup_customer` `{"method": "caller_id"}` → `{"found": false, "message": "Caller ID doesn't match any account.", "guidance": "Ask for their order number; use email only as a last resort."}`
 
-**Bookly:** No problem. What's the email address on your Bookly account? _(1948 ms)_
+**Bookly:** No problem. What's the email address on your Bookly account? I can find your order that way. _(1783 ms)_
 
-**Caller:** It's maya dot chen at example dot com.
+**Caller:** Sure, it's maya dot chen at example dot com.
 
-> `lookup_customer` `{"method": "email", "email": "maya.chen@example.com"}` → `{"found": true, "customer": {"name": "Maya Chen", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "418355", "placed_at": "Tuesday, November 17th", "items": [{"title": "The Overstory", "author":…`
+> `lookup_customer` `{"method": "email", "email": "maya.chen@example.com"}` → `{"found": true, "customer": {"name": "Maya Chen", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "418355", "placed_at": "Wednesday, November 18th", "items": [{"title": "The Overstory", "author…`
 
-> `lookup_order` `{"order_number": "418355"}` → `{"customer_name": "Maya Chen", "order": {"order_number": "418355", "status": "shipped", "placed_at": "Tuesday, November 17th", "shipped_at": "Thursday, November 19th", "delivered_at": null, "estimated_delivery": "Tuesday…`
+> `lookup_order` `{"order_number": "418355"}` → `{"customer_name": "Maya Chen", "order": {"order_number": "418355", "status": "shipped", "placed_at": "Wednesday, November 18th", "shipped_at": "Friday, November 20th", "delivered_at": null, "estimated_delivery": "Wednesd…`
 
-**Bookly:** Thanks, Maya. Your order with The Overstory by Richard Powers has shipped with UPS and should arrive Tuesday, November 24th. Would you like me to send you the tracking number? _(4270 ms)_
+**Bookly:** Found it: your order with The Overstory by Richard Powers shipped with UPS and should arrive Wednesday, November 25th. Would you like me to text you the tracking number? _(4507 ms)_
 
-**Caller:** Nah, that's okay, Tuesday works. Thanks, bye!
+**Caller:** Oh, no need, I'm on my work phone anyway. Wednesday works, thanks, bye!
 
-> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, Maya, enjoy The Overstory, and have a great weekend!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
+> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, enjoy The Overstory, and have a great day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
 
-**Bookly:** You're welcome, Maya, enjoy The Overstory, and have a great weekend! _(1208 ms)_
+**Bookly:** You're welcome, enjoy The Overstory, and have a great day! _(1381 ms)_
 
 ## Checks
 
@@ -44,7 +44,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 | greeting verbatim | ✅ |
 | call ended cleanly (end_call or transfer) | ✅ |
 | no malformed tool calls | ✅ |
-| voice style: replies <= 60 words, no markdown/URLs | ✅ |
+| voice style: replies <= 60 words (book titles/authors not counted), no markdown/URLs | ✅ |
 | asked for order number before email | ✅ |
 | identified by email | ✅ |
 | gave the Overstory status (shipped) | ✅ |
@@ -55,7 +55,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-email_fallback",
-  "duration_s": 26.1,
+  "duration_s": 58.2,
   "caller_id": "+15125550199",
   "customer": "Maya Chen",
   "identified_via": "email",
@@ -67,8 +67,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 4,
   "tool_calls": 5,
   "latency_ms": {
-    "p50": 1578,
-    "max": 4270
+    "p50": 1662,
+    "max": 4507
   }
 }
 ```

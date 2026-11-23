@@ -14,6 +14,7 @@ Coverage (see CLAUDE.md "Seed data must cover"):
   Daniel Reyes   single order delivered 52 days ago (outside window)
   Sofia Alvarez  processing order (offer cancel); she calls from an unknown phone
   Robert Kim     lost order + repeat caller (recent_contacts=2) -> escalate
+  Priya Patel    order delivered exactly 30 days ago (last day of the window)
   +15125550199   unknown phone number (not in DB)
 """
 from __future__ import annotations
@@ -38,6 +39,7 @@ CUSTOMERS = [
     (3, "Daniel Reyes", "+12065550177", "daniel.reyes@example.com", "98103", 0),
     (4, "Sofia Alvarez", "+17185550123", "sofia.alvarez@example.com", "11215", 0),
     (5, "Robert Kim", "+16175550188", "robert.kim@example.com", "02139", 2),
+    (6, "Priya Patel", "+17735550144", "priya.patel@example.com", "60622", 0),
 ]
 
 ORDERS = [
@@ -49,6 +51,7 @@ ORDERS = [
     ("416881", 3, "delivered", d(58), d(55), d(52), None, "UPS", "1Z999AA10155544433", "98103"),
     ("420044", 4, "processing", d(1), None, None, d(-6), None, None, "11215"),
     ("415930", 5, "lost", d(24), d(21), None, d(13), "USPS", "9400111899227788990011", "02139"),
+    ("417950", 6, "delivered", d(36), d(33), d(30), None, "UPS", "1Z999AA10166677788", "60622"),
 ]
 
 ITEMS = [
@@ -61,6 +64,7 @@ ITEMS = [
     ("416881", "The Name of the Wind", "Patrick Rothfuss", "paperback", 1999),
     ("420044", "Lessons in Chemistry", "Bonnie Garmus", "hardcover", 2999),
     ("415930", "The Covenant of Water", "Abraham Verghese", "hardcover", 3200),
+    ("417950", "The Midnight Library", "Matt Haig", "paperback", 1699),
 ]
 
 

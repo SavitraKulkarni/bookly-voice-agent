@@ -19,7 +19,9 @@ from fastapi.responses import PlainTextResponse, Response
 from twilio.request_validator import RequestValidator
 
 import bookly.agent  # noqa: F401  (loads .env on import)
-from bookly.voice.call import HANDOFFS, CallSession, load_phrases, whisper_twiml
+import hmac
+
+from bookly.voice.call import HANDOFFS, CallSession, load_phrases, stream_token, whisper_twiml
 
 PORT = int(os.environ.get("PORT", "8080"))
 
@@ -49,9 +51,11 @@ async def voice(request: Request):
         if not RequestValidator(token).validate(f"https://{host}/voice", form, sig):
             return PlainTextResponse("invalid signature", status_code=403)
     caller = form.get("From", "")
+    token = stream_token(form.get("CallSid", ""), caller)
     twiml = (
         '<?xml version="1.0" encoding="UTF-8"?><Response><Connect>'
-        f'<Stream url="wss://{host}/media"><Parameter name="caller" value={quoteattr(caller)}/></Stream>'
+        f'<Stream url="wss://{host}/media"><Parameter name="caller" value={quoteattr(caller)}/>'
+        f'<Parameter name="token" value={quoteattr(token)}/></Stream>'
         "</Connect></Response>"
     )
     return Response(content=twiml, media_type="application/xml")
@@ -88,7 +92,14 @@ async def media(ws: WebSocket):
             ev = msg.get("event")
             if ev == "start":
                 st = msg["start"]
-                caller = (st.get("customParameters") or {}).get("caller") or None
+                params = st.get("customParameters") or {}
+                caller = params.get("caller") or None
+                call_sid = st.get("callSid", "")
+                expected = stream_token(call_sid, caller or "")
+                if not call_sid or not hmac.compare_digest(params.get("token", ""), expected):
+                    print("[media] rejected a stream without a valid token")
+                    await ws.close(code=1008)
+                    return
                 session = CallSession(ws, st["streamSid"], st.get("callSid", st["streamSid"]), caller)
                 # Test hook for the loopback A/B. Only reachable over the WebSocket: real calls get their
                 # parameters from our own TwiML, which never sets it.

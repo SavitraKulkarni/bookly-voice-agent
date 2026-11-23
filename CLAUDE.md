@@ -60,12 +60,12 @@ Answer only from the FAQ. Not found → say so and offer a transfer. Password re
 ## Tools
 - `lookup_customer(method: caller_id | email)` — caller ID comes from the carrier (Twilio `From` / CLI `--phone`), never from a number the caller speaks. Code runs the caller-ID lookup automatically at call start.
 - `lookup_order(order_number)` — also identifies an unknown caller (read access to that order only).
-- `verify_zip(zip)` — matches the account ZIP or the selected order's shipping ZIP. Required for every write. Two failures → no writes, offer transfer.
+- `verify_zip(zip)` — matches the account (billing) ZIP only; the shipping ZIP is on the package. Required for every write. Two failures → no writes, offer transfer.
 - `cancel_order(order_number)` — `processing` orders only.
 - `start_return(order_number, item, reason, resolution: refund | store_credit)` — records the return. Refund goes to the original payment after the book is received.
-- `issue_store_credit(return_id)` — pays store credit immediately for a store-credit return. Idempotent on return_id.
+- `issue_store_credit(return_id)` — re-checks the credit on a store-credit return; `start_return` already issues it in the same transaction when confirmed. Idempotent on return_id.
 - `search_faq(query)`, `send_password_reset()` (mock, sends to email on file), `send_confirmation(channel)` (SMS/email mocked to the tool log — A2P 10DLC not registered; only to the caller ID or email on file), `transfer_to_human(reason, summary)`, `end_call()`.
-- Writes are two-phase in code: first call returns a read-back and stores `pending_action`; only a second call after the caller's next turn executes it. All writes are idempotent.
+- Writes are two-phase in code: first call returns a read-back and stores `pending_action`; only a second call on the caller's very next turn, with the same details, executes it (later = `read_back_expired`). All writes are idempotent. Order-number/email lookups lock after 3 misses.
 
 ## Seed data must cover
 Multi-order customer; multi-book order; statuses `processing` (offer cancel), `shipped`, `delivered`, `lost` (escalate); one delivered order inside the 30-day return window and one outside; an unknown phone number (not in DB); a repeat caller (`recent_contacts` ≥ 2 → escalate). Dates are seeded relative to today so the 30-day window always holds.
