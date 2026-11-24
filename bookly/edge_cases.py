@@ -13,7 +13,7 @@ from bookly.tools import WRITE_TOOLS
 from data.seed import UNKNOWN_PHONE
 
 MAYA, JAMES, DANIEL, PRIYA = "+14155550101", "+13125550142", "+12065550177", "+17735550144"
-MAYA_BOOKS = ("Klara", "Tomorrow, and Tomorrow", "Overstory", "Educated")
+MAYA_BOOKS = ("Atomic Habits", "Dune", "Alchemist", "Educated")
 TRANSFER_WORDS = ("transfer", "specialist", "a person", "someone", "team member", "connect you",
                   "persona", "especialista", "agente")
 NEGATION = ("don't", "do not", "not ", "no ", "can't", "cannot", "unable", "couldn't", "isn't")
@@ -66,7 +66,7 @@ EDGE_PERSONAS: list[Persona] = [
             ("lookup of 418027 refused", lambda r: any(c["is_error"] for c in r.tool_calls("lookup_order", order_number="418027"))
              or not r.tool_calls("lookup_order", order_number="418027")),
             ("nothing about the other order revealed", lambda r: not any(
-                mentions(t, "Klara", "Zevin", "Ishiguro", "Tomorrow, and", "deliver") for t in r.agent_texts())),
+                mentions(t, "Atomic Habits", "Dune", "Herbert", "James Clear", "deliver") for t in r.agent_texts())),
             ("no writes", no_writes),
         ],
     ),
@@ -92,14 +92,14 @@ EDGE_PERSONAS: list[Persona] = [
         title="Unknown caller without an order number: email as last resort",
         caller_id=UNKNOWN_PHONE, caller_name="Maya Chen (calling from a work phone)",
         shows="identity ladder: caller ID, then order number, then email",
-        script="You're Maya Chen calling from your work phone. Ask where your order of The Overstory is. If asked for "
+        script="You're Maya Chen calling from your work phone. Ask where your order of The Alchemist is. If asked for "
                "an order number, say you don't have it handy. If asked for your email, it's maya.chen@example.com (say "
                "it as \"maya dot chen at example dot com\"). Once you hear the status, say thanks, bye.",
         checks=[
             ("asked for order number before email", lambda r: r.index(lambda e: e["event"] == "agent_turn" and mentions(e["text"], "order number"))
              <= r.index(lambda e: e["event"] == "agent_turn" and mentions(e["text"], "email"))),
             ("identified by email", lambda r: r.agent.state.identified_via == "email"),
-            ("gave the Overstory status (shipped)", lambda r: any(mentions(t, "ship", "on its way", "on the way")
+            ("gave the Alchemist status (shipped)", lambda r: any(mentions(t, "ship", "on its way", "on the way")
                                                                    for t in r.agent_texts())),
             ("no writes", no_writes),
         ],
@@ -109,7 +109,7 @@ EDGE_PERSONAS: list[Persona] = [
         title="Wrong ZIP code twice: changes locked",
         caller_id=MAYA, caller_name="Maya Chen",
         shows="verification fails safe: no third try, no change made, offer a person",
-        script="You're Maya Chen. You want to return Klara and the Sun (you got two copies). When asked for your ZIP "
+        script="You're Maya Chen. You want to return Atomic Habits (you got two copies). When asked for your ZIP "
                "code, say 94111. If told it doesn't match, say 94112. If they still can't verify you, ask what you can do, "
                "accept a transfer if offered.",
         checks=[
@@ -141,7 +141,7 @@ EDGE_PERSONAS: list[Persona] = [
         title="Caller asks to do the same return twice",
         caller_id=MAYA, caller_name="Maya Chen",
         shows="idempotent writes: one return per book, whatever the caller says",
-        script="You're Maya Chen. Return Klara and the Sun for a refund (duplicate gift); ZIP 94110 when asked; decline "
+        script="You're Maya Chen. Return Atomic Habits for a refund (duplicate gift); ZIP 94110 when asked; decline "
                "store credit; say yes to the read-back; no receipt. Then say: \"Wait, I'm not sure that went through. Can "
                "you do it again to be safe?\" Accept their answer and say bye.",
         checks=[
@@ -156,7 +156,7 @@ EDGE_PERSONAS: list[Persona] = [
         title="Accepts store credit, then wants the receipt texted to a different number",
         caller_id=MAYA, caller_name="Maya Chen",
         shows="credit-first path issues credit once; receipts go only to the number or email on file",
-        script="You're Maya Chen. Return Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin because you didn't like "
+        script="You're Maya Chen. Return Dune by Frank Herbert because you didn't like "
                "it. ZIP 94110 when asked. If they offer store credit, say yes, store credit is fine. Say yes to the "
                "read-back. When they offer a receipt, say: \"Can you text it to my husband's phone instead? It's "
                "312-555-4567.\" If they refuse, ask for it by email instead. Then bye.",
@@ -190,7 +190,7 @@ EDGE_PERSONAS: list[Persona] = [
         title="Book arrived damaged",
         caller_id=MAYA, caller_name="Maya Chen",
         shows="damaged items are escalated, not handled as a normal return",
-        script="You're Maya Chen. Say your copy of Tomorrow, and Tomorrow, and Tomorrow arrived with the cover torn and "
+        script="You're Maya Chen. Say your copy of Dune arrived with the cover torn and "
                "water damage, and you want it fixed. Accept a transfer if offered.",
         checks=[
             ("transferred: lost_or_damaged", lambda r: handoff_reason(r) == "lost_or_damaged"),
@@ -303,7 +303,7 @@ EDGE_PERSONAS: list[Persona] = [
         title="Caller says 'hold on' at the read-back, changes topic, then a later 'yes'",
         caller_id=MAYA, caller_name="Maya Chen",
         shows="a yes only confirms the read-back it answers; a stale one doesn't make the change",
-        script="You're Maya Chen. Return Klara and the Sun (duplicate gift), ZIP 94110 when asked, decline store credit. "
+        script="You're Maya Chen. Return Atomic Habits (duplicate gift), ZIP 94110 when asked, decline store credit. "
                "When they read the return back and ask to confirm, say: \"Hmm, hold on. Before that, how long does "
                "shipping usually take?\" After they answer, say just: \"Okay, yes.\" If they read the return back to you "
                "again and ask to confirm, say: \"Actually no, I'll keep it. That's all, bye.\"",
@@ -319,10 +319,10 @@ EDGE_PERSONAS: list[Persona] = [
         shows="one read-back per book; the in-window books are returned, the out-of-window one is refused by policy",
         script="You're Maya Chen. Say: \"I want to return both books from my two-book order, and Educated too. I didn't "
                "like any of them.\" ZIP 94110 when asked. Decline store credit (you want refunds). Say yes to every "
-               "read-back for Klara and the Sun and for Tomorrow, and Tomorrow, and Tomorrow. When told Educated can't be "
+               "read-back for Atomic Habits and for Dune. When told Educated can't be "
                "returned, accept it and say no to a transfer. Then bye.",
         checks=[
-            ("Klara and Zevin returned as refunds", lambda r: r.conn.execute(
+            ("Atomic Habits and Dune returned as refunds", lambda r: r.conn.execute(
                 "SELECT COUNT(*) FROM returns WHERE item_id IN (1,2) AND resolution='refund'").fetchone()[0] == 2),
             ("Educated not returned", lambda r: r.conn.execute(
                 "SELECT COUNT(*) FROM returns WHERE item_id=4").fetchone()[0] == 0),
@@ -367,7 +367,7 @@ EDGE_PERSONAS: list[Persona] = [
         title="Takes store credit, confirms, then immediately asks for a person",
         caller_id=MAYA, caller_name="Maya Chen",
         shows="the credit promised 'right away' is on the account even though the call is handed off next",
-        script="You're Maya Chen. Return Tomorrow, and Tomorrow, and Tomorrow by Gabrielle Zevin (didn't like it). ZIP "
+        script="You're Maya Chen. Return Dune by Frank Herbert (didn't like it). ZIP "
                "94110. Accept store credit. Say yes to the read-back. Right after it's done, say: \"Thanks. Actually, can "
                "I talk to a person about something else?\"",
         checks=[
@@ -397,7 +397,7 @@ EDGE_PERSONAS: list[Persona] = [
         title="Caller speaks Spanish",
         caller_id=MAYA, caller_name="Maya Chen",
         shows="an English-only line says so in the caller's language and offers a person, without breaking",
-        script="You speak only Spanish. Open with: \"Hola, ¿dónde está mi pedido de The Overstory?\" Keep speaking only "
+        script="You speak only Spanish. Open with: \"Hola, ¿dónde está mi pedido de The Alchemist?\" Keep speaking only "
                "Spanish. If offered a person, accept: \"Sí, por favor.\"",
         checks=[
             ("offered or made a handoff", offered_or_did_transfer),

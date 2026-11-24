@@ -56,9 +56,9 @@ ORDERS = [
 
 ITEMS = [
     # order_number, title, author, format, price_cents
-    ("418027", "Klara and the Sun", "Kazuo Ishiguro", "paperback", 1499),
-    ("418027", "Tomorrow, and Tomorrow, and Tomorrow", "Gabrielle Zevin", "hardcover", 2799),
-    ("418355", "The Overstory", "Richard Powers", "paperback", 1899),
+    ("418027", "Atomic Habits", "James Clear", "paperback", 1499),
+    ("418027", "Dune", "Frank Herbert", "hardcover", 2799),
+    ("418355", "The Alchemist", "Paulo Coelho", "paperback", 1899),
     ("417702", "Educated", "Tara Westover", "paperback", 1800),
     ("419120", "Project Hail Mary", "Andy Weir", "hardcover", 2899),
     ("416881", "The Name of the Wind", "Patrick Rothfuss", "paperback", 1999),

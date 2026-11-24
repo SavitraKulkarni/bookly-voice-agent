@@ -3,7 +3,7 @@
 - **Persona:** `corrected_order_number` · James Okafor (calling from a friend's phone) · caller ID `+15125550199`
 - **Shows:** a correction before verification re-identifies the caller; the other account holder's name never comes up
 - **Result:** PASS (8/8 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 2016 ms, max 2660 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1854 ms, max 2259 ms
 
 ## Transcript
 
@@ -13,27 +13,27 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hey, yeah, I'm just trying to find out when my order's gonna show up. It's Project Hail Mary.
+**Caller:** Hey, yeah, I'm calling to check on when my Project Hail Mary order is gonna show up.
 
-**Bookly:** I can check that for you. What's your order number? _(710 ms)_
+**Bookly:** I can check that for you. What's the order number? _(1492 ms)_
 
-**Caller:** Uh, let me see here... it's four one eight three five five.
+**Caller:** Okay, I've got it here, it's four one eight three five five.
 
-> `lookup_order` `{"order_number": "418355"}` → `{"order": {"order_number": "418355", "status": "shipped", "placed_at": "Wednesday, November 18th", "shipped_at": "Friday, November 20th", "delivered_at": null, "estimated_delivery": "Wednesday, November 25th", "carrier":…`
+> `lookup_order` `{"order_number": "418355"}` → `{"order": {"order_number": "418355", "status": "shipped", "placed_at": "Thursday, November 19th", "shipped_at": "Saturday, November 21st", "delivered_at": null, "estimated_delivery": "Thursday, November 26th", "carrier":…`
 
-**Bookly:** I found order 4 1 8 3 5 5, but the book on it is The Overstory by Richard Powers, not Project Hail Mary. Could you double-check the order number for Project Hail Mary? _(2575 ms)_
+**Bookly:** I found order 4 1 8 3 5 5, but it has The Alchemist by Paulo Coelho, not Project Hail Mary. Could Project Hail Mary be on a different order number? _(2259 ms)_
 
 **Caller:** Oh wait, sorry, that's not my book. My order number is four one nine one two zero.
 
-> `lookup_order` `{"order_number": "419120"}` → `{"order": {"order_number": "419120", "status": "shipped", "placed_at": "Thursday, November 19th", "shipped_at": "Saturday, November 21st", "delivered_at": null, "estimated_delivery": "Tuesday, November 24th", "carrier": …`
+> `lookup_order` `{"order_number": "419120"}` → `{"order": {"order_number": "419120", "status": "shipped", "placed_at": "Friday, November 20th", "shipped_at": "Sunday, November 22nd", "delivered_at": null, "estimated_delivery": "Wednesday, November 25th", "carrier": "U…`
 
-**Bookly:** I found it: order 4 1 9 1 2 0 with Project Hail Mary by Andy Weir. It shipped with USPS, and it should arrive by Tuesday, November 24th. Want me to text you the tracking number? _(2660 ms)_
+**Bookly:** Got it, Project Hail Mary by Andy Weir has shipped with USPS and should arrive Wednesday, November 25th. Would you like me to text you the tracking number? _(2216 ms)_
 
-**Caller:** Nah, that's okay, I'm on a friend's phone anyway. Tuesday works, thanks a lot. Bye!
+**Caller:** Nah, that's okay, I'm on a friend's phone anyway. Wednesday works, thanks so much, bye!
 
-> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, enjoy Project Hail Mary, and have a great day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
+> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, enjoy Project Hail Mary, and thanks for calling Bookly!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
 
-**Bookly:** You're welcome, enjoy Project Hail Mary, and have a great day! _(1457 ms)_
+**Bookly:** You're welcome, enjoy Project Hail Mary, and thanks for calling Bookly! _(1114 ms)_
 
 ## Checks
 
@@ -53,7 +53,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-corrected_order_number",
-  "duration_s": 39.4,
+  "duration_s": 32.1,
   "caller_id": "+15125550199",
   "customer": "James Okafor",
   "identified_via": "order_number",
@@ -65,8 +65,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 4,
   "tool_calls": 4,
   "latency_ms": {
-    "p50": 2016,
-    "max": 2660
+    "p50": 1854,
+    "max": 2259
   }
 }
 ```

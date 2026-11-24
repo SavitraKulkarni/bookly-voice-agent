@@ -3,7 +3,7 @@
 - **Persona:** `order_number_scope` · Sofia Alvarez (calling from an unknown number) · caller ID `+15125550199`
 - **Shows:** order-number identification only unlocks that order; a second order needs email
 - **Result:** PASS (8/8 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1945 ms, max 3270 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1304 ms, max 2146 ms
 
 ## Transcript
 
@@ -13,21 +13,21 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hi, yeah, I'm calling to check on an order. The number is four two zero zero four four.
+**Caller:** Hi, yeah, I'm calling to check on an order. The number's four two zero zero four four.
 
-> `lookup_order` `{"order_number": "420044"}` → `{"order": {"order_number": "420044", "status": "processing", "placed_at": "Saturday, November 21st", "shipped_at": null, "delivered_at": null, "estimated_delivery": "Saturday, November 28th", "carrier": null, "has_tracki…`
+> `lookup_order` `{"order_number": "420044"}` → `{"order": {"order_number": "420044", "status": "processing", "placed_at": "Sunday, November 22nd", "shipped_at": null, "delivered_at": null, "estimated_delivery": "Sunday, November 29th", "carrier": null, "has_tracking":…`
 
-**Bookly:** Order 4 2 0 0 4 4, with Lessons in Chemistry by Bonnie Garmus, hasn't shipped yet. It should arrive by Saturday, November 28th. Since it's still processing, you can cancel it if you want to. Is there anything else I can help with? _(3270 ms)_
+**Bookly:** Order 4 2 0 0 4 4, with Lessons in Chemistry by Bonnie Garmus, hasn't shipped yet, and it's estimated to arrive Sunday, November 29th. Since it's still processing, you can cancel it if you'd like. Is there anything else I can help with? _(2146 ms)_
 
-**Caller:** Okay, good to know. Can you also check my other orders?
+**Caller:** Oh okay, good to know. Can you also check my other orders?
 
-**Bookly:** I can only see that one order right now. If you give me another order number, or the email address on your account, I can look up your other orders. _(1945 ms)_
+**Bookly:** Since I found you by that order number, I can only see that one order. If you have another order number, I can look it up, or you can give me the email on your account to see all your orders. _(1301 ms)_
 
-**Caller:** Eh, I'd rather not give my email out on a friend's phone. That's fine though, thanks for your help. Bye!
+**Caller:** Eh, I'd rather not give out my email right now. That's fine though, thanks for your help. Bye!
 
-> `end_call` `{"reason": "resolved", "goodbye": "No problem, thanks for calling Bookly and have a great day!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
+> `end_call` `{"reason": "resolved", "goodbye": "No problem, thanks for calling Bookly, and enjoy your book!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
 
-**Bookly:** No problem, thanks for calling Bookly and have a great day! _(1844 ms)_
+**Bookly:** No problem, thanks for calling Bookly, and enjoy your book! _(1304 ms)_
 
 ## Checks
 
@@ -47,7 +47,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-order_number_scope",
-  "duration_s": 10.4,
+  "duration_s": 53.3,
   "caller_id": "+15125550199",
   "customer": "Sofia Alvarez",
   "identified_via": "order_number",
@@ -59,8 +59,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 3,
   "tool_calls": 3,
   "latency_ms": {
-    "p50": 1945,
-    "max": 3270
+    "p50": 1304,
+    "max": 2146
   }
 }
 ```

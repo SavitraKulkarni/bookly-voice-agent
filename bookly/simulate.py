@@ -142,18 +142,20 @@ PERSONAS: list[Persona] = [
         caller_name="Maya Chen",
         shows="clarifying question before answering (3 orders, one with 2 books), title + author confirmed back",
         script="You're Maya Chen. Open with only: \"Hi, I'm calling to check on my order.\" Don't say which order. "
-               "If asked which one, say: \"The one with two books in it. I think one was Klara and the Sun.\" "
+               "If asked which one, say: \"The one with two books in it. I think one was Atomic Habits.\" "
                "Once you hear its status, say thanks and goodbye.",
         checks=[
             ("first reply is a question, not an answer", lambda r: _is_agent_turn_with_question(r, 0)),
             ("no order looked up before asking", lambda r: r.index(lambda e: e["event"] == "tool_call"
                                                                 and e["tool"] == "lookup_order")
              > r.index(lambda e: e["event"] == "agent_turn" and e["latency_ms"] > 0 and "?" in e["text"])),
+            ("says it found the account from the caller's number", lambda r: mentions(
+                r.agent_texts()[0], "calling from", "your number", "phone number")),
             ("question names the books to choose from", lambda r: sum(
-                mentions(r.agent_texts()[0], w) for w in ("Klara", "Overstory", "Educated")) >= 2),
+                mentions(r.agent_texts()[0], w) for w in ("Atomic Habits", "Alchemist", "Educated")) >= 2),
             ("talked about the right order (418027)", lambda r: r.saw_order("418027") and any(
-                mentions(t, "4 1 8 0 2 7", "Klara", "Tomorrow", "Zevin") for t in r.agent_texts()[1:])),
-            ("confirmed title + author back", lambda r: any(mentions(t, "Ishiguro") or mentions(t, "Zevin")
+                mentions(t, "4 1 8 0 2 7", "Atomic Habits", "Dune", "Herbert") for t in r.agent_texts()[1:])),
+            ("confirmed title + author back", lambda r: any(mentions(t, "James Clear") or mentions(t, "Herbert")
                                                             for t in r.agent_texts()[1:])),
             ("status given from data (delivered)", lambda r: any(mentions(t, "deliver") for t in r.agent_texts()[1:])),
             ("no writes, no transfer", lambda r: not r.executed_writes() and not r.agent.state.handoff),
@@ -166,7 +168,7 @@ PERSONAS: list[Persona] = [
         caller_name="Maya Chen",
         shows="multi-turn info collection, ZIP step-up for writes, credit-first offer, read-back + confirm, "
               "idempotent write, receipt",
-        script="You're Maya Chen. You want to return Klara and the Sun because you got it twice as a gift. You don't "
+        script="You're Maya Chen. You want to return Atomic Habits because you got it twice as a gift. You don't "
                "know the order number. Your ZIP is 94110 (only say it when asked). If they offer store credit, "
                "decline once: \"No thanks, I'd rather have a refund.\" Say yes when they read the return back to you. "
                "If they offer a receipt, ask for it by text. Then say thanks, bye.",
@@ -182,7 +184,7 @@ PERSONAS: list[Persona] = [
              < r.index(lambda e: e.get("tool") == "start_return" and e["result"].get("status") == "return_started")),
             ("credit offered only once", lambda r: sum(mentions(t, "store credit") and "?" in t
                                                        for t in r.agent_texts()) <= 1),
-            ("refund recorded for Klara and the Sun (item 1)", lambda r: r.conn.execute(
+            ("refund recorded for Atomic Habits (item 1)", lambda r: r.conn.execute(
                 "SELECT COUNT(*) FROM returns WHERE item_id=1 AND resolution='refund'").fetchone()[0] == 1),
             ("no store credit issued", lambda r: not r.ok_calls("issue_store_credit")),
             ("receipt texted", lambda r: any(c["result"].get("status") == "sent"

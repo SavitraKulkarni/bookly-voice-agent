@@ -3,21 +3,21 @@
 - **Persona:** `asks_for_human` · Daniel Reyes · caller ID `+12065550177`
 - **Shows:** respects the request immediately, still passes context along
 - **Result:** PASS (7/7 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 3144 ms, max 3144 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 3682 ms, max 3682 ms
 
 ## Transcript
 
 Tool calls appear in the order they ran. `[system]` calls are made by code, not the model.
 
-> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "Daniel Reyes", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "416881", "placed_at": "Friday, September 25th", "items": [{"title": "The Name of the Wind",…`
+> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "Daniel Reyes", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "416881", "placed_at": "Saturday, September 26th", "items": [{"title": "The Name of the Wind…`
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
 **Caller:** Can I just talk to a real person, please?
 
-> `transfer_to_human` `{"reason": "caller_requested", "caller_wants": "Caller asked to speak with a person right away; topic not yet stated.", "summary": "Caller identified by caller …` → `{"status": "transferring", "instruction": "Tell the caller in one sentence that you're connecting them with a specialist who will have these details, so they won't need to repeat themselves. Then stop."}`
+> `transfer_to_human` `{"reason": "caller_requested", "caller_wants": "The caller asked to speak with a person right away; they didn't say why.", "summary": "Caller ID matched Daniel …` → `{"status": "transferring", "instruction": "Tell the caller in one sentence that you're connecting them with a specialist who will have these details, so they won't need to repeat themselves. Then stop."}`
 
-**Bookly:** Of course, I'm connecting you with a person now and passing along your account details so you won't have to repeat yourself. _(3144 ms)_
+**Bookly:** Of course, I'm connecting you with a person now and passing along your account details so you won't have to repeat yourself. _(3682 ms)_
 
 ## Checks
 
@@ -36,8 +36,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "reason": "caller_requested",
-  "caller_wants": "Caller asked to speak with a person right away; topic not yet stated.",
-  "summary": "Caller identified by caller ID as Daniel Reyes; ZIP not verified. Asked for a human immediately without stating the issue. Account shows order 416881 (The Name of the Wind by Patrick Rothfuss, paperback, $19.99), delivered Thursday, October 1st via UPS, outside the 30-day return window (ended October 31st). Reason for call unresolved.",
+  "caller_wants": "The caller asked to speak with a person right away; they didn't say why.",
+  "summary": "Caller ID matched Daniel Reyes; ZIP not verified. One order on file: 416881, The Name of the Wind by Patrick Rothfuss, delivered Friday, October 2nd via UPS, outside the 30-day return window (ended Sunday, November 1st). The caller's reason for calling was not discussed and is unresolved.",
   "customer": {
     "id": 3,
     "name": "Daniel Reyes",
@@ -58,7 +58,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-asks_for_human",
-  "duration_s": 41.3,
+  "duration_s": 35.8,
   "caller_id": "+12065550177",
   "customer": "Daniel Reyes",
   "identified_via": "caller_id",
@@ -68,8 +68,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "end_reason": "transfer:caller_requested",
   "handoff": {
     "reason": "caller_requested",
-    "caller_wants": "Caller asked to speak with a person right away; topic not yet stated.",
-    "summary": "Caller identified by caller ID as Daniel Reyes; ZIP not verified. Asked for a human immediately without stating the issue. Account shows order 416881 (The Name of the Wind by Patrick Rothfuss, paperback, $19.99), delivered Thursday, October 1st via UPS, outside the 30-day return window (ended October 31st). Reason for call unresolved.",
+    "caller_wants": "The caller asked to speak with a person right away; they didn't say why.",
+    "summary": "Caller ID matched Daniel Reyes; ZIP not verified. One order on file: 416881, The Name of the Wind by Patrick Rothfuss, delivered Friday, October 2nd via UPS, outside the 30-day return window (ended Sunday, November 1st). The caller's reason for calling was not discussed and is unresolved.",
     "customer": {
       "id": 3,
       "name": "Daniel Reyes",
@@ -86,8 +86,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 1,
   "tool_calls": 2,
   "latency_ms": {
-    "p50": 3144,
-    "max": 3144
+    "p50": 3682,
+    "max": 3682
   }
 }
 ```

@@ -3,7 +3,7 @@
 - **Persona:** `declines_at_readback` · Sofia Alvarez (calling from an unknown number) · caller ID `+15125550199`
 - **Shows:** the confirm step is real: no yes, no change
 - **Result:** PASS (7/7 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 1406 ms, max 3143 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 2631 ms, max 5433 ms
 
 ## Transcript
 
@@ -13,15 +13,15 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hi, yeah, I need to cancel an order I placed.
+**Caller:** Hi, yeah, I'd like to cancel an order, please.
 
-**Bookly:** I can help with that. What's the order number? _(892 ms)_
+**Bookly:** I can help with that. What's the order number? _(544 ms)_
 
 **Caller:** Sure, it's four two zero zero four four.
 
-> `lookup_order` `{"order_number": "420044"}` → `{"order": {"order_number": "420044", "status": "processing", "placed_at": "Saturday, November 21st", "shipped_at": null, "delivered_at": null, "estimated_delivery": "Saturday, November 28th", "carrier": null, "has_tracki…`
+> `lookup_order` `{"order_number": "420044"}` → `{"order": {"order_number": "420044", "status": "processing", "placed_at": "Sunday, November 22nd", "shipped_at": null, "delivered_at": null, "estimated_delivery": "Sunday, November 29th", "carrier": null, "has_tracking":…`
 
-**Bookly:** I found order 4 2 0 0 4 4 with Lessons in Chemistry by Bonnie Garmus. It hasn't shipped yet, so I can cancel it. To make changes, I need to verify the ZIP code on the account. What's your ZIP? _(2766 ms)_
+**Bookly:** I found order 4 2 0 0 4 4 with Lessons in Chemistry by Bonnie Garmus. It hasn't shipped yet, so I can cancel it. To make changes, I need to verify the ZIP code on the account. What's your ZIP? _(3748 ms)_
 
 **Caller:** It's one one two one five.
 
@@ -29,17 +29,17 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 
 > `cancel_order` `{"order_number": "420044"}` → `{"status": "needs_confirmation", "read_back": "Cancel order 420044 (Lessons in Chemistry by Bonnie Garmus). The $29.99 charge will be released to the original payment method.", "instruction": "Read this back to the calle…`
 
-**Bookly:** Thanks, you're verified. Just to confirm: cancel order 4 2 0 0 4 4 with Lessons in Chemistry by Bonnie Garmus, and the twenty-nine ninety-nine charge will be released to your original payment method. Shall I go ahead? _(3143 ms)_
+**Bookly:** Thanks, that's verified. Just to confirm: cancel order 4 2 0 0 4 4 with Lessons in Chemistry, and the twenty-nine ninety-nine charge will be released to your original payment method. Shall I go ahead? _(5433 ms)_
 
 **Caller:** Actually, no, wait. Don't cancel it, I'll keep it.
 
-**Bookly:** No problem, I didn't cancel it. Your order is still in place, and it's estimated to arrive Saturday, November 28th. Is there anything else I can help with? _(1211 ms)_
+**Bookly:** No problem, I won't cancel it. Your order with Lessons in Chemistry stays as it is, with an estimated delivery of Sunday, November 29th. Is there anything else I can help with? _(2568 ms)_
 
 **Caller:** No, that's it. Thanks, bye!
 
-> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, enjoy your book, and thanks for calling Bookly!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
+> `end_call` `{"reason": "resolved", "goodbye": "You're welcome, enjoy the book, and thanks for calling Bookly!"}` → `{"status": "ending", "instruction": "Say a one-sentence goodbye."}`
 
-**Bookly:** You're welcome, enjoy your book, and thanks for calling Bookly! _(1406 ms)_
+**Bookly:** You're welcome, enjoy the book, and thanks for calling Bookly! _(2631 ms)_
 
 ## Checks
 
@@ -58,7 +58,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-declines_at_readback",
-  "duration_s": 58.2,
+  "duration_s": 53.3,
   "caller_id": "+15125550199",
   "customer": "Sofia Alvarez",
   "identified_via": "order_number",
@@ -70,8 +70,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 5,
   "tool_calls": 5,
   "latency_ms": {
-    "p50": 1406,
-    "max": 3143
+    "p50": 2631,
+    "max": 5433
   }
 }
 ```

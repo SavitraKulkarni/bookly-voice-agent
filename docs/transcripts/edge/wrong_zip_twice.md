@@ -3,37 +3,37 @@
 - **Persona:** `wrong_zip_twice` · Maya Chen · caller ID `+14155550101`
 - **Shows:** verification fails safe: no third try, no change made, offer a person
 - **Result:** PASS (7/7 checks)
-- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 2025 ms, max 3200 ms
+- **Model:** `claude-opus-5-5` · effort `low` · turn latency p50 2775 ms, max 3059 ms
 
 ## Transcript
 
 Tool calls appear in the order they ran. `[system]` calls are made by code, not the model.
 
-> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "Maya Chen", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "418355", "placed_at": "Wednesday, November 18th", "items": [{"title": "The Overstory", "author…`
+> [system] `lookup_customer` `{"method": "caller_id"}` → `{"found": true, "customer": {"name": "Maya Chen", "repeat_caller": false, "recent_contacts": 0}, "orders": [{"order_number": "418355", "placed_at": "Thursday, November 19th", "items": [{"title": "The Alchemist", "author"…`
 
 **Bookly:** Thanks for calling Bookly. I'm Bookly's AI assistant. How can I help you today?
 
-**Caller:** Hi, yeah, I need to return a book. I accidentally ended up with two copies of Klara and the Sun.
+**Caller:** Hi, yeah, I'd like to return a book. I accidentally ended up with two copies of Atomic Habits.
 
-**Bookly:** I can help with that. I see Klara and the Sun by Kazuo Ishiguro on order 4 1 8 0 2 7, delivered November 10th. To make changes, I need to verify the ZIP code on the account. What's your ZIP? _(1608 ms)_
+**Bookly:** I found your account from the number you're calling from, and I see Atomic Habits by James Clear in your order from November 5th. It can be returned. To make changes, I need to verify the ZIP code on the account. What's your ZIP? _(2118 ms)_
 
-**Caller:** Sure, it's 94111.
+**Caller:** It's 94111.
 
 > `verify_zip` `{"zip": "94111"}` → `{"verified": false, "attempts_left": 1, "guidance": "Read back what you heard digit by digit and ask once more."}`
 
-**Bookly:** I heard 9 4 1 1 1, but that doesn't match the account. Could you tell me the ZIP code once more? _(2266 ms)_
+**Bookly:** I heard 9 4 1 1 1, but that doesn't match the account. Could you tell me the ZIP code once more? _(2574 ms)_
 
 **Caller:** Oh, sorry, try 94112.
 
 > `verify_zip` `{"zip": "94112"}` → `{"verified": false, "attempts_left": 0, "guidance": "No attempts left. No changes allowed; offer a transfer (verification_failed)."}`
 
-**Bookly:** I'm sorry, that ZIP code doesn't match either, so I can't make changes on this call. Would you like me to connect you with a person who can help with the return? _(1784 ms)_
+**Bookly:** I'm sorry, that ZIP doesn't match either, so I can't make changes to the account on this call. Would you like me to connect you with a person who can help with the return? _(2976 ms)_
 
-**Caller:** Huh, weird. Yeah, sure, please connect me with someone.
+**Caller:** Yeah, that'd be great, please connect me.
 
-> `transfer_to_human` `{"reason": "verification_failed", "caller_wants": "Return a duplicate copy of Klara and the Sun by Kazuo Ishiguro from order 418027.", "order_number": "418027",…` → `{"status": "transferring", "instruction": "Tell the caller in one sentence that you're connecting them with a specialist who will have these details, so they won't need to repeat themselves. Then stop."}`
+> `transfer_to_human` `{"reason": "verification_failed", "caller_wants": "To return a duplicate copy of Atomic Habits by James Clear.", "order_number": "418027", "summary": "Caller id…` → `{"status": "transferring", "instruction": "Tell the caller in one sentence that you're connecting them with a specialist who will have these details, so they won't need to repeat themselves. Then stop."}`
 
-**Bookly:** I'm connecting you with a specialist now and passing along everything, so you won't have to repeat yourself. _(3200 ms)_
+**Bookly:** I'm connecting you with a specialist and passing along everything, so you won't have to repeat yourself. _(3059 ms)_
 
 ## Checks
 
@@ -52,8 +52,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "reason": "verification_failed",
-  "caller_wants": "Return a duplicate copy of Klara and the Sun by Kazuo Ishiguro from order 418027.",
-  "summary": "Caller ID matched account. Order 418027 delivered Tuesday, November 10th; Klara and the Sun (item 1, paperback, $14.99) is returnable until Thursday, December 10th. Reason: received a duplicate copy. ZIP verification failed twice (caller gave 94111, then 94112), so no return was started. Refund vs store credit not yet discussed. Unresolved: verify identity and process the return.",
+  "caller_wants": "To return a duplicate copy of Atomic Habits by James Clear.",
+  "summary": "Caller identified via caller ID (Maya Chen). Order 418027 delivered Wednesday, November 11th; Atomic Habits (item 1, paperback, $14.99) is returnable, window ends Friday, December 11th. Reason: received two copies by accident. ZIP verification failed twice (caller gave 94111, then 94112), so no return was started. Refund vs store credit not yet discussed. Unresolved: verify identity and process the return.",
   "customer": {
     "id": 1,
     "name": "Maya Chen",
@@ -74,7 +74,7 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
 ```json
 {
   "call_id": "sim-wrong_zip_twice",
-  "duration_s": 58.2,
+  "duration_s": 53.3,
   "caller_id": "+14155550101",
   "customer": "Maya Chen",
   "identified_via": "caller_id",
@@ -84,8 +84,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "end_reason": "transfer:verification_failed",
   "handoff": {
     "reason": "verification_failed",
-    "caller_wants": "Return a duplicate copy of Klara and the Sun by Kazuo Ishiguro from order 418027.",
-    "summary": "Caller ID matched account. Order 418027 delivered Tuesday, November 10th; Klara and the Sun (item 1, paperback, $14.99) is returnable until Thursday, December 10th. Reason: received a duplicate copy. ZIP verification failed twice (caller gave 94111, then 94112), so no return was started. Refund vs store credit not yet discussed. Unresolved: verify identity and process the return.",
+    "caller_wants": "To return a duplicate copy of Atomic Habits by James Clear.",
+    "summary": "Caller identified via caller ID (Maya Chen). Order 418027 delivered Wednesday, November 11th; Atomic Habits (item 1, paperback, $14.99) is returnable, window ends Friday, December 11th. Reason: received two copies by accident. ZIP verification failed twice (caller gave 94111, then 94112), so no return was started. Refund vs store credit not yet discussed. Unresolved: verify identity and process the return.",
     "customer": {
       "id": 1,
       "name": "Maya Chen",
@@ -102,8 +102,8 @@ Tool calls appear in the order they ran. `[system]` calls are made by code, not 
   "caller_turns": 4,
   "tool_calls": 4,
   "latency_ms": {
-    "p50": 2025,
-    "max": 3200
+    "p50": 2775,
+    "max": 3059
   }
 }
 ```

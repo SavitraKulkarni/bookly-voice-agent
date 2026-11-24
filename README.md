@@ -192,7 +192,7 @@ Each entry: what I chose, what it costs, and why it was worth it.
   | Same + effort `medium` | 18/18 | 2.4 s | 4.0 s | 1.45 | $0.041 |
 
   \* Agent model calls only (not the simulated caller), from logged token counts at Opus 5.5 list prices ($4 in / $20 out / $0.20 cache read per million tokens). Conversations averaged ~3.7 caller turns. The final verification run of the six personas cost $0.032 per conversation.
-  † The one miss was an over-strict check (the agent named the right book, "Klara and the Sun", but the check wanted the other title). The check was widened and the final run passed 6/6.
+  † The one miss was an over-strict check (the agent named the right book, "Atomic Habits", but the check wanted the other title). The check was widened and the final run passed 6/6.
 - **Trade-off:** Prefetch makes each call ~0.25 s slower (bigger state note, more to read) and costs ~$0.004 more per conversation; the saved round trips more than pay it back. The model also sees statuses before it asks "which order?". The clarifying-question simulation checks it still asks first (3/3 in the A/B, plus the final run).
 - **Not yet measured:** each change alone, and effort `high`. The biggest remaining lever for callers is in phone mode: a filler line during tool calls and streaming the first sentence to TTS, measured as time to first audio.
 
